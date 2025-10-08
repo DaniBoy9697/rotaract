@@ -6,12 +6,34 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 
+type Club = {
+  id: number;
+  name: string;
+  city: string;
+  president: string;
+  email: string;
+  phone: string;
+  members: number;
+  founded: string;
+  points: number;
+  district: string;
+  address: string;
+};
+
+type StateKey =
+  | 'Ciudad de México'
+  | 'Jalisco'
+  | 'Nuevo León'
+  | 'Puebla'
+  | 'Baja California'
+  | 'Yucatán';
+
 export default function Clubs() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedState, setSelectedState] = useState('');
+  const [selectedState, setSelectedState] = useState<StateKey | ''>('');
 
   // Datos mock de clubes organizados por estado
-  const clubsByState = {
+  const clubsByState: Record<StateKey, Club[]> = {
     'Ciudad de México': [
       {
         id: 1,
@@ -134,16 +156,22 @@ export default function Clubs() {
   const allClubs = Object.values(clubsByState).flat();
 
   const getFilteredClubs = () => {
-    let clubs = selectedState ? clubsByState[selectedState] || [] : allClubs;
-    
+    let clubs: any[] = [];
+
+    if (selectedState && Object.prototype.hasOwnProperty.call(clubsByState, selectedState)) {
+      clubs = clubsByState[selectedState] || [];
+    } else {
+      clubs = allClubs;
+    }
+
     if (searchTerm) {
-      clubs = clubs.filter(club =>
+      clubs = clubs.filter((club) =>
         club.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         club.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
         club.president.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
-    
+
     return clubs;
   };
 
@@ -202,7 +230,7 @@ export default function Clubs() {
                       stroke="white"
                       strokeWidth="2"
                       className="cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => setSelectedState(selectedState === state ? '' : state)}
+                      onClick={() => setSelectedState(selectedState === state ? '' : state as StateKey)}
                     />
                     
                     {/* Número de clubes */}
@@ -325,7 +353,7 @@ export default function Clubs() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {filteredClubs.map((club) => (
+          {filteredClubs.map((club: { id: React.Key | null | undefined; name: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; city: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; address: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; district: any; president: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; email: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; phone: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; members: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; founded: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; points: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; }) => (
             <Card key={club.id} className="hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="flex justify-between items-start">

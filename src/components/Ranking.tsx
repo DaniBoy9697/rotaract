@@ -139,7 +139,7 @@ export default function Ranking() {
   };
 
   const rankedClubs = getFilteredAndSortedClubs();
-  const districts = [...new Set(clubs.map(club => club.district))];
+  const districts = Array.from(new Set(clubs.map(club => club.district)));
 
   const getRankIcon = (index: number) => {
     switch (index) {

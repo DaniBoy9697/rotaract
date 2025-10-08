@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { Plus, Calendar, User, Heart, MessageCircle, Share2, Search, Filter, LogIn, UserPlus, Upload, Eye } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -16,11 +17,8 @@ import PostDetail from './PostDetail';
 
 // Mock de configuración de WordPress API
 const WORDPRESS_CONFIG = {
-  apiUrl: 'https://tu-sitio-wordpress.com/wp-json/wp/v2',
-  // En producción, estas credenciales se manejarían de forma segura
-  // A través de variables de entorno y autenticación JWT
-  username: 'YOUR_WP_USERNAME',
-  password: 'YOUR_WP_APP_PASSWORD'
+  apiUrl: process.env.REACT_APP_WORDPRESS_API || '',
+  jwtEndpoint: process.env.REACT_APP_JWT_ENDPOINT || ''
 };
 
 export default function Posts() {
@@ -97,8 +95,7 @@ export default function Posts() {
   ];
 
   // Inicializar posts
-  useEffect(() => {
-    setPosts(mockPosts);
+ useEffect(() => {
     loadPostsFromWordPress();
     
     // Verificar si hay usuario guardado en localStorage
@@ -120,45 +117,55 @@ export default function Posts() {
   const loadPostsFromWordPress = async () => {
     setIsLoading(true);
     try {
-      // Mock de llamada a WordPress API
-      // const response = await fetch(`${WORDPRESS_CONFIG.apiUrl}/posts?per_page=20&_embed`);
-      // const wpPosts = await response.json();
-      
-      // Por ahora usamos datos mock
-      console.log('WordPress API integration ready for:', WORDPRESS_CONFIG.apiUrl);
-      setIsLoading(false);
+      const response = await axios.get(`${WORDPRESS_CONFIG.apiUrl}/posts?per_page=20&_embed`);
+      const wpPosts = response.data.map((wp: any) => ({
+        id: wp.id,
+        title: wp.title.rendered,
+        content: wp.excerpt.rendered.replace(/<[^>]+>/g, ''), // Limpia HTML
+        author: wp._embedded?.author?.[0]?.name || 'Desconocido',
+        authorAvatar: wp._embedded?.author?.[0]?.name?.split(' ').map((n: string) => n[0]).join('') || 'AU',
+        club: wp.meta?.rotaract_club || '',
+        date: wp.date,
+        category: wp._embedded?.['wp:term']?.[0]?.[0]?.name || 'Sin categoría',
+        image: wp._embedded?.['wp:featuredmedia']?.[0]?.source_url || '',
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        status: wp.status,
+        wpId: wp.id
+      }));
+      setPosts(wpPosts);
     } catch (error) {
       console.error('Error loading posts from WordPress:', error);
-      setIsLoading(false);
+      setPosts(mockPosts); // fallback a mock si falla
     }
+    setIsLoading(false);
   };
-
   // Función para crear post en WordPress
   const createPostInWordPress = async (postData: any) => {
     try {
-      // Mock de autenticación JWT y creación de post
+      const jwtToken = localStorage.getItem('rotaract_jwt');
       const wpPostData = {
         title: postData.title,
         content: postData.content,
-        status: 'draft', // Empieza como borrador para revisión
+        status: 'draft',
         categories: [getCategoryIdBySlug(postData.category)],
         meta: {
           rotaract_club: postData.club,
           rotaract_author: postData.author
         }
       };
-
-      // const response = await fetch(`${WORDPRESS_CONFIG.apiUrl}/posts`, {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //     'Authorization': `Bearer ${jwtToken}`
-      //   },
-      //   body: JSON.stringify(wpPostData)
-      // });
-
-      console.log('Post would be created in WordPress with data:', wpPostData);
-      return { id: Date.now(), ...wpPostData };
+      const response = await axios.post(
+        `${WORDPRESS_CONFIG.apiUrl}/posts`,
+        wpPostData,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${jwtToken}`
+          }
+        }
+      );
+      return response.data;
     } catch (error) {
       console.error('Error creating post in WordPress:', error);
       throw error;
@@ -166,32 +173,28 @@ export default function Posts() {
   };
 
   // Función para autenticación con WordPress
+  // Autenticación con WordPress (JWT)
   const authenticateWithWordPress = async (username: string, password: string) => {
     try {
-      // Mock de autenticación JWT
-      // const response = await fetch(`${WORDPRESS_CONFIG.apiUrl.replace('/wp/v2', '')}/jwt-auth/v1/token`, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ username, password })
-      // });
-
-      // const authData = await response.json();
-      
-      // Mock de usuario autenticado
-      const mockUser = {
-        id: 1,
-        username: username,
-        name: 'Usuario Demo',
-        email: 'usuario@rotaract.org',
-        club: 'Rotaract Club Demo',
-        avatar: 'UD'
+      const response = await axios.post(
+        WORDPRESS_CONFIG.jwtEndpoint,
+        { username, password },
+        { headers: { 'Content-Type': 'application/json' } }
+      );
+      const authData = response.data;
+      localStorage.setItem('rotaract_jwt', authData.token);
+      const user = {
+        id: authData.user_id,
+        username: authData.user_nicename,
+        name: authData.user_display_name,
+        email: authData.user_email,
+        club: '', // Puedes obtenerlo de la API de usuario si lo tienes en un campo personalizado
+        avatar: authData.user_display_name?.split(' ').map((n: string) => n[0]).join('') || 'UD'
       };
-
-      setCurrentUser(mockUser);
+      setCurrentUser(user);
       setIsLoggedIn(true);
-      localStorage.setItem('rotaract_user', JSON.stringify(mockUser));
-      
-      return mockUser;
+      localStorage.setItem('rotaract_user', JSON.stringify(user));
+      return user;
     } catch (error) {
       console.error('Error authenticating with WordPress:', error);
       throw error;
@@ -334,7 +337,7 @@ export default function Posts() {
           <Label htmlFor="category">Categoría</Label>
           <Select 
             value={newPost.category} 
-            onValueChange={(value) => setNewPost({...newPost, category: value})}
+            onValueChange={(value: any) => setNewPost({...newPost, category: value})}
           >
             <SelectTrigger>
               <SelectValue placeholder="Selecciona una categoría" />

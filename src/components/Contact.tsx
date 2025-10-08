@@ -178,7 +178,7 @@ export default function Contact() {
                   {/* Tipo de Consulta */}
                   <div className="space-y-2">
                     <Label htmlFor="type">Tipo de Consulta *</Label>
-                    <Select value={formData.type} onValueChange={(value) => handleInputChange('type', value)}>
+                    <Select value={formData.type} onValueChange={(value: string) => handleInputChange('type', value)}>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecciona el tipo de consulta" />
                       </SelectTrigger>

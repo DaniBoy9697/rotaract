@@ -4,7 +4,6 @@ import { Button } from './components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
 import { Badge } from './components/ui/badge';
 import { Separator } from './components/ui/separator';
-import rotaractLogo from '/img/rota-logo.png';
 
 // Componentes de página
 import Welcome from './components/Welcome';
@@ -63,7 +62,7 @@ export default function App() {
             {/* Logo */}
             <div className="flex items-center space-x-3">
               <img 
-                src={rotaractLogo} 
+                src="/img/rota-logo.png" 
                 alt="Rotaract Logo" 
                 className="h-10 w-auto"
               />
@@ -152,11 +151,11 @@ export default function App() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div>
               <div className="flex items-center space-x-3 mb-4">
-                <img 
-                  src={rotaractLogo} 
+               <img 
+                  src="/img/rota-logo.png" 
                   alt="Rotaract Logo" 
                   className="h-8 w-auto brightness-0 invert"
-                />
+                />  
                 <h3 className="text-lg font-semibold">Rotaract</h3>
               </div>
               <p className="text-pink-100">
