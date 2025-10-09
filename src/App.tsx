@@ -18,7 +18,7 @@ import Contact from './components/Contact';
 const navigationItems = [
   { id: 'welcome', label: 'Bienvenida', icon: Home },
   { id: 'clubs', label: 'Directorio de Clubes', icon: Users },
-  { id: 'ranking', label: 'Ranking de Clubes', icon: Trophy },
+  { id: 'ranking', label: 'Engrane Challenge', icon: Trophy },
   { id: 'awards', label: 'Premios y Galardones', icon: Award },
   { id: 'worldweek', label: 'Semana Mundial Rotaract', icon: Calendar },
   { id: 'posts', label: 'Últimos Posts', icon: FileText },
@@ -60,17 +60,11 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
-            <div className="flex items-center space-x-3">
-              <img 
-                src="/img/rota-logo.png" 
-                alt="Rotaract Logo" 
-                className="h-10 w-auto"
-              />
-              <div>
-                <h1 className="text-xl font-bold" style={{ color: 'var(--rotaract-pink)' }}>Rotaract</h1>
-                <p className="text-sm text-gray-600">Servicio por encima de sí mismo</p>
-              </div>
-            </div>
+            <img
+              src="/img/rota-logo.png"
+              alt="Rotaract Logo"
+              className="h-10 w-auto px-2"
+            />
 
             {/* Desktop Navigation */}
             <nav className="hidden lg:flex space-x-1">
@@ -82,11 +76,10 @@ export default function App() {
                     variant={currentPage === item.id ? 'default' : 'ghost'}
                     size="sm"
                     onClick={() => setCurrentPage(item.id)}
-                    className={`flex items-center space-x-2 ${
-                      currentPage === item.id 
-                        ? 'text-white hover:opacity-90' 
-                        : 'text-gray-700 hover:text-[#E91E63]'
-                    }`}
+                    className={`flex items-center space-x-2 ${currentPage === item.id
+                      ? 'text-white hover:opacity-90'
+                      : 'text-gray-700 hover:text-[#E91E63]'
+                      }`}
                     style={currentPage === item.id ? { backgroundColor: 'var(--rotaract-pink)' } : {}}
                   >
                     <Icon className="w-4 h-4" />
@@ -123,11 +116,10 @@ export default function App() {
                       setCurrentPage(item.id);
                       setMobileMenuOpen(false);
                     }}
-                    className={`w-full justify-start ${
-                      currentPage === item.id 
-                        ? 'text-white' 
-                        : 'text-gray-700'
-                    }`}
+                    className={`w-full justify-start ${currentPage === item.id
+                      ? 'text-white'
+                      : 'text-gray-700'
+                      }`}
                     style={currentPage === item.id ? { backgroundColor: 'var(--rotaract-pink)' } : {}}
                   >
                     <Icon className="w-4 h-4 mr-3" />
@@ -151,15 +143,14 @@ export default function App() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div>
               <div className="flex items-center space-x-3 mb-4">
-               <img 
-                  src="/img/rota-logo.png" 
-                  alt="Rotaract Logo" 
+                <img
+                  src="/img/rota-logo.png"
+                  alt="Rotaract Logo"
                   className="h-8 w-auto brightness-0 invert"
-                />  
-                <h3 className="text-lg font-semibold">Rotaract</h3>
+                />
               </div>
               <p className="text-pink-100">
-                Una organización internacional de jóvenes profesionales y universitarios 
+                Una organización internacional de jóvenes profesionales y universitarios
                 comprometidos con el servicio comunitario y el desarrollo del liderazgo.
               </p>
             </div>
@@ -211,7 +202,7 @@ export default function App() {
           </div>
           <Separator className="my-6 bg-pink-800" />
           <div className="text-center text-pink-100">
-            <p>&copy; 2024 Rotaract International. Todos los derechos reservados.</p>
+            <p>&copy; 2025 Rotaract 4185. Hecho con el corazon por Dani N.</p>
           </div>
         </div>
       </footer>

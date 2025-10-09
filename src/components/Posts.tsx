@@ -437,10 +437,12 @@ export default function Posts() {
                   <LoginForm />
                 </DialogContent>
               </Dialog>
+              {/* Sistema de Autenticación
               <Button variant="outline" size="sm">
                 <UserPlus className="w-4 h-4 mr-2" />
                 Registrarse
               </Button>
+              */}
             </div>
           </AlertDescription>
         </Alert>
@@ -696,7 +698,7 @@ export default function Posts() {
         </div>
       )}
 
-      {/* Información sobre WordPress Integration */}
+      {/* Información sobre WordPress Integration
       <Card className="bg-gradient-to-r from-blue-50 to-yellow-50 border-blue-200">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
@@ -739,7 +741,7 @@ export default function Posts() {
             </AlertDescription>
           </Alert>
         </CardContent>
-      </Card>
+      </Card>*/}
     </div>
   );
 }

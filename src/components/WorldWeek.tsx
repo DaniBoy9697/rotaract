@@ -125,7 +125,7 @@ export default function WorldWeek() {
               <Button size="lg" className="bg-yellow-500 text-blue-900 hover:bg-yellow-400">
                 Ver Programa Completo
               </Button>
-              <Button size="lg" variant="outline" className="border-white text-white hover:bg-white hover:text-blue-900">
+              <Button size="lg" variant="outline" className="border-white hover:bg-white hover:text-blue-900">
                 Registrarse Ahora
               </Button>
             </div>
@@ -306,7 +306,7 @@ export default function WorldWeek() {
         </div>
       </section>
 
-      {/* Call to Action */}
+      {/* Call to Action 
       <section className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 lg:p-12 text-white text-center">
         <h2 className="text-3xl font-bold mb-4">
           ¡Únete a la Celebración!
@@ -331,6 +331,7 @@ export default function WorldWeek() {
           </Button>
         </div>
       </section>
+      */}
     </div>
   );
 }

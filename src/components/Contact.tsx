@@ -39,27 +39,6 @@ export default function Contact() {
       primary: 'info@rotaract.org',
       secondary: 'contacto@rotaract.org',
       description: 'Para consultas generales y soporte'
-    },
-    {
-      icon: Phone,
-      title: 'Teléfono',
-      primary: '+1 (555) 123-4567',
-      secondary: '+1 (555) 987-6543',
-      description: 'Lunes a Viernes, 9:00 AM - 6:00 PM'
-    },
-    {
-      icon: MapPin,
-      title: 'Oficina Principal',
-      primary: '1560 Sherman Avenue',
-      secondary: 'Evanston, IL 60201, USA',
-      description: 'Sede internacional de Rotaract'
-    },
-    {
-      icon: Globe,
-      title: 'Oficina Regional',
-      primary: 'Ciudad de México, México',
-      secondary: 'Coordinación para América Latina',
-      description: 'Apoyo para clubes de la región'
     }
   ];
 
@@ -259,7 +238,7 @@ export default function Contact() {
             </CardContent>
           </Card>
 
-          {/* Horarios de Atención */}
+          {/* Horarios de Atención
           <Card>
             <CardHeader>
               <CardTitle className="text-xl text-gray-900 flex items-center">
@@ -280,6 +259,7 @@ export default function Contact() {
               </p>
             </CardContent>
           </Card>
+          */}
 
           {/* Respuesta Rápida */}
           <Card className="bg-green-50 border-green-200">

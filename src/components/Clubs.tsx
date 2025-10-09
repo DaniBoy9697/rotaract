@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import MexicoMapComponent from './MexicoMap';
 import { Search, MapPin, Phone, Mail, User, Building2, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
@@ -20,25 +21,181 @@ type Club = {
   address: string;
 };
 
-type StateKey =
-  | 'Ciudad de México'
-  | 'Jalisco'
-  | 'Nuevo León'
-  | 'Puebla'
-  | 'Baja California'
-  | 'Yucatán';
+type StateKey = 'Veracruz' | 'Morelos' | 'Tlaxcala' | 'Puebla' | 'Guerrero';
+
+type ClubsByState = Record<StateKey, Club[]>;
+
+type MexicoMapProps = {
+  selected: StateKey | '';
+  setSelected: (s: StateKey | '') => void;
+  counts: Record<StateKey, number>;
+  className?: string;
+};
+
+const STATE_LIST: StateKey[] = ['Veracruz', 'Morelos', 'Tlaxcala', 'Puebla', 'Guerrero'];
+
+/**
+ * Mapa SVG minimalista de México con 5 estados como paths clicables.
+ * viewBox 1000x640 (eje X a la derecha, eje Y hacia abajo - estándar SVG).
+ * Los paths NO son cartografía oficial; son simplificados para UI/UX.
+ */
+function MexicoMap({ selected, setSelected, counts }: MexicoMapProps) {
+  // Centroides (para etiquetas/bolas) normalizados al viewBox 1000x640
+  const centroids: Record<StateKey, { x: number; y: number }> = {
+    Veracruz: { x: 760, y: 360 }, // Golfo, centro-este
+    Puebla:   { x: 650, y: 330 }, // Centro-este
+    Tlaxcala: { x: 665, y: 300 }, // Muy cerca de Puebla (ligeramente arriba/izq)
+    Morelos:  { x: 620, y: 360 }, // Al sur de CDMX
+    Guerrero: { x: 560, y: 440 }, // Pacífico, más al sur
+  };
+
+  // Paths (silhueta simplificada para cada estado) - aproximaciones estilizadas
+  // Mantienen coherencia visual y clic.
+  const statePaths: Record<StateKey, string> = {
+    Veracruz:
+      'M770,290 L810,320 L835,360 L820,400 L785,430 L740,410 L730,370 L745,335 Z',
+    Puebla:
+      'M610,300 L660,300 L690,330 L675,360 L635,360 L610,330 Z',
+    Tlaxcala:
+      'M665,285 L680,295 L675,310 L655,310 L650,295 Z',
+    Morelos:
+      'M590,350 L625,350 L640,370 L625,395 L595,395 L585,375 Z',
+    Guerrero:
+      'M510,410 L570,410 L600,430 L590,470 L540,490 L500,470 L490,435 Z',
+  };
+
+  // Contorno general simplificado del país (solo decorativo)
+  const mexicoOutline =
+    'M130,210 L220,170 L320,190 L420,160 L520,190 L600,220 L680,240 L740,270 L800,310 L840,360 L820,420 L760,460 L680,490 L590,520 L520,520 L440,500 L360,470 L300,430 L240,380 L180,330 L140,280 Z';
+
+  // Escalado del radio por conteo (usa raíz para escalar suave)
+  const getRadius = (count: number) => {
+    if (count <= 0) return 0;
+    const base = 8; // radio mínimo
+    return base + Math.sqrt(count) * 4; // ajusta si quieres más/menos impacto
+  };
+
+  return (
+    <div className="relative">
+      <svg
+        viewBox="0 0 1000 640"
+        className="w-full h-auto border rounded-lg bg-gradient-to-br from-blue-50 to-pink-50"
+      >
+        {/* Contorno decorativo */}
+        <path
+          d={mexicoOutline}
+          fill="none"
+          stroke="rgba(0,0,0,0.08)"
+          strokeWidth={8}
+        />
+        <path
+          d={mexicoOutline}
+          fill="rgba(255,255,255,0.6)"
+          stroke="rgba(0,0,0,0.12)"
+          strokeWidth={2}
+        />
+
+        {/* Estados interactivos */}
+        {STATE_LIST.map((st) => {
+          const isActive = selected === st;
+          return (
+            <g key={st}>
+              <path
+                d={statePaths[st]}
+                fill={isActive ? 'var(--rotaract-pink)' : 'var(--rotaract-blue)'}
+                fillOpacity={isActive ? 0.25 : 0.15}
+                stroke={isActive ? 'var(--rotaract-pink)' : 'var(--rotaract-blue)'}
+                strokeOpacity={0.6}
+                strokeWidth={isActive ? 3 : 2}
+                className="cursor-pointer transition-all hover:opacity-80"
+                onClick={() => setSelected(isActive ? '' : st)}
+              />
+
+              {/* Burbuja de cantidad (centrada en el “centroid” del estado) */}
+              {counts[st] > 0 && (
+                <>
+                  <circle
+                    cx={centroids[st].x}
+                    cy={centroids[st].y}
+                    r={getRadius(counts[st])}
+                    fill={isActive ? 'var(--rotaract-pink)' : 'var(--rotaract-blue)'}
+                    fillOpacity={isActive ? 0.85 : 0.7}
+                    stroke="white"
+                    strokeWidth={2}
+                    className="cursor-pointer"
+                    onClick={() => setSelected(isActive ? '' : st)}
+                  />
+                  <text
+                    x={centroids[st].x}
+                    y={centroids[st].y + 3}
+                    textAnchor="middle"
+                    fontSize={14}
+                    fontWeight={700}
+                    fill="white"
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    {counts[st]}
+                  </text>
+                  <text
+                    x={centroids[st].x}
+                    y={centroids[st].y + getRadius(counts[st]) + 16}
+                    textAnchor="middle"
+                    fontSize={12}
+                    fontWeight={500}
+                    fill="var(--rotaract-pink)"
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    {st}
+                  </text>
+                </>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function Legend({ totalStates }: { totalStates: number }) {
+  return (
+    <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+      <h4 className="font-medium text-gray-900 mb-2">Leyenda:</h4>
+      <div className="flex flex-wrap gap-4 text-sm">
+        <div className="flex items-center space-x-2">
+          <div
+            className="w-4 h-4 rounded-full"
+            style={{ backgroundColor: 'var(--rotaract-blue)' }}
+          />
+          <span>Estados con clubes</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div
+            className="w-4 h-4 rounded-full"
+            style={{ backgroundColor: 'var(--rotaract-pink)' }}
+          />
+          <span>Estado seleccionado</span>
+        </div>
+      </div>
+      <p className="text-xs text-gray-600 mt-2">
+        * El tamaño del círculo representa el número de clubes. Haz clic para filtrar.
+      </p>
+      <p className="text-xs text-gray-500 mt-1">Estados mostrados: {totalStates}</p>
+    </div>
+  );
+}
 
 export default function Clubs() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedState, setSelectedState] = useState<StateKey | ''>('');
 
-  // Datos mock de clubes organizados por estado
-  const clubsByState: Record<StateKey, Club[]> = {
-    'Ciudad de México': [
+  // ====== DATA MOCK ======
+  const clubsByState: ClubsByState = {
+    Veracruz: [
       {
         id: 1,
-        name: 'Rotaract Club Ciudad de México Centro',
-        city: 'Ciudad de México',
+        name: 'Rotaract Club Tierra Blanca',
+        city: 'Veracruz',
         president: 'María González Rodríguez',
         email: 'cdmxcentro@rotaract.org',
         phone: '+52 55 1234 5678',
@@ -50,8 +207,8 @@ export default function Clubs() {
       },
       {
         id: 7,
-        name: 'Rotaract Club CDMX Polanco',
-        city: 'Ciudad de México',
+        name: 'Rotaract Club Veleros',
+        city: 'Boca del Río',
         president: 'Jorge Martínez Silva',
         email: 'cdmxpolanco@rotaract.org',
         phone: '+52 55 9876 5432',
@@ -62,11 +219,11 @@ export default function Clubs() {
         address: 'Av. Masaryk 250, Polanco'
       }
     ],
-    'Jalisco': [
+    Morelos: [
       {
         id: 2,
-        name: 'Rotaract Club Guadalajara Metropolitan',
-        city: 'Guadalajara',
+        name: 'Rotaract Club Cuautla Segundo Centenario',
+        city: 'Cuautla',
         president: 'Carlos Hernández López',
         email: 'gdlmetro@rotaract.org',
         phone: '+52 33 9876 5432',
@@ -78,23 +235,23 @@ export default function Clubs() {
       },
       {
         id: 8,
-        name: 'Rotaract Club Zapopan',
-        city: 'Zapopan',
+        name: 'Rotaract Club Yautepec',
+        city: 'Yautepec',
         president: 'Patricia López Ruiz',
-        email: 'zapopan@rotaract.org',
+        email: 'yautepec@rotaract.org',
         phone: '+52 33 3456 7890',
         members: 29,
         founded: '2008',
         points: 950,
         district: '4140',
-        address: 'Av. Patria 1234, Zapopan'
+        address: 'Av. Patria 1234, Yautepec'
       }
     ],
-    'Nuevo León': [
+    Tlaxcala: [
       {
         id: 3,
-        name: 'Rotaract Club Monterrey Tecnológico',
-        city: 'Monterrey',
+        name: 'Rotaract Club Tlaxcala Tecnológico',
+        city: 'Tlaxcala',
         president: 'Ana Patricia Morales',
         email: 'mtytech@rotaract.org',
         phone: '+52 81 2468 1357',
@@ -105,7 +262,7 @@ export default function Clubs() {
         address: 'Av. Tecnológico 456, Col. Obispado'
       }
     ],
-    'Puebla': [
+    Puebla: [
       {
         id: 4,
         name: 'Rotaract Club Puebla Colonial',
@@ -120,72 +277,46 @@ export default function Clubs() {
         address: 'Calle 5 de Mayo 789, Centro Histórico'
       }
     ],
-    'Baja California': [
+    Guerrero: [
       {
         id: 5,
-        name: 'Rotaract Club Tijuana Frontera',
-        city: 'Tijuana',
+        name: 'Rotaract Club Acapulco Costa',
+        city: 'Acapulco',
         president: 'Laura Jiménez Castro',
-        email: 'tijuanafrontera@rotaract.org',
+        email: 'acapulco@rotaract.org',
         phone: '+52 66 4789 6321',
         members: 34,
         founded: '2000',
         points: 1150,
         district: '4100',
-        address: 'Av. Revolución 1234, Zona Centro'
-      }
-    ],
-    'Yucatán': [
-      {
-        id: 6,
-        name: 'Rotaract Club Mérida Histórico',
-        city: 'Mérida',
-        president: 'Diego Pacheco Uc',
-        email: 'meridahistorico@rotaract.org',
-        phone: '+52 99 8574 1236',
-        members: 27,
-        founded: '2005',
-        points: 890,
-        district: '4195',
-        address: 'Calle 60 x 47, Centro Histórico'
+        address: 'Av. Costera 1234, Centro'
       }
     ]
   };
 
-  // Obtener todos los clubes para búsqueda
-  const allClubs = Object.values(clubsByState).flat();
+  const allClubs = useMemo(() => Object.values(clubsByState).flat(), [clubsByState]);
 
-  const getFilteredClubs = () => {
-    let clubs: any[] = [];
+  const filteredClubs = useMemo(() => {
+    const inState = selectedState ? clubsByState[selectedState] : allClubs;
+    if (!searchTerm) return inState;
+    const q = searchTerm.toLowerCase();
+    return inState.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.city.toLowerCase().includes(q) ||
+        c.president.toLowerCase().includes(q)
+    );
+  }, [allClubs, clubsByState, selectedState, searchTerm]);
 
-    if (selectedState && Object.prototype.hasOwnProperty.call(clubsByState, selectedState)) {
-      clubs = clubsByState[selectedState] || [];
-    } else {
-      clubs = allClubs;
-    }
-
-    if (searchTerm) {
-      clubs = clubs.filter((club) =>
-        club.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        club.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        club.president.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    return clubs;
-  };
-
-  const filteredClubs = getFilteredClubs();
-
-  // Datos del mapa SVG de México simplificado
-  const mexicanStates = {
-    'Ciudad de México': { x: 380, y: 280, clubs: clubsByState['Ciudad de México']?.length || 0 },
-    'Jalisco': { x: 250, y: 240, clubs: clubsByState['Jalisco']?.length || 0 },
-    'Nuevo León': { x: 350, y: 170, clubs: clubsByState['Nuevo León']?.length || 0 },
-    'Puebla': { x: 410, y: 290, clubs: clubsByState['Puebla']?.length || 0 },
-    'Baja California': { x: 80, y: 100, clubs: clubsByState['Baja California']?.length || 0 },
-    'Yucatán': { x: 550, y: 240, clubs: clubsByState['Yucatán']?.length || 0 }
-  };
+ const counts: Record<StateKey, number> = useMemo(() => {
+    return {
+      Veracruz: clubsByState.Veracruz?.length || 0,
+      Morelos: clubsByState.Morelos?.length || 0,
+      Tlaxcala: clubsByState.Tlaxcala?.length || 0,
+      Puebla: clubsByState.Puebla?.length || 0,
+      Guerrero: clubsByState.Guerrero?.length || 0,
+    };
+  }, [clubsByState]);
 
   return (
     <div className="space-y-8">
@@ -196,7 +327,7 @@ export default function Clubs() {
           <h1 className="text-4xl font-bold text-gray-900">Directorio de Clubes Rotaract</h1>
         </div>
         <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-          Descubre y conecta con clubes Rotaract en México. Encuentra oportunidades 
+          Descubre y conecta con clubes Rotaract en México. Encuentra oportunidades
           de servicio, liderazgo y amistad cerca de ti.
         </p>
       </div>
@@ -211,76 +342,29 @@ export default function Clubs() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="relative">
-              {/* SVG Map of Mexico */}
-              <svg 
-                viewBox="0 0 600 400" 
-                className="w-full h-auto border rounded-lg bg-gradient-to-br from-blue-50 to-pink-50"
-              >
-                {/* Estados con clubes */}
-                {Object.entries(mexicanStates).map(([state, data]) => (
-                  <g key={state}>
-                    {/* Círculo del estado */}
-                    <circle
-                      cx={data.x}
-                      cy={data.y}
-                      r={Math.max(15, data.clubs * 5)}
-                      fill={selectedState === state ? 'var(--rotaract-pink)' : 'var(--rotaract-blue)'}
-                      fillOpacity={selectedState === state ? 0.8 : 0.6}
-                      stroke="white"
-                      strokeWidth="2"
-                      className="cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => setSelectedState(selectedState === state ? '' : state as StateKey)}
-                    />
-                    
-                    {/* Número de clubes */}
-                    <text
-                      x={data.x}
-                      y={data.y + 2}
-                      textAnchor="middle"
-                      className="text-white text-sm font-bold pointer-events-none"
-                      fill="white"
-                    >
-                      {data.clubs}
-                    </text>
-                    
-                    {/* Nombre del estado */}
-                    <text
-                      x={data.x}
-                      y={data.y + 35}
-                      textAnchor="middle"
-                      className="text-xs font-medium pointer-events-none"
-                      fill="var(--rotaract-pink)"
-                    >
-                      {state}
-                    </text>
-                  </g>
-                ))}
-              </svg>
-              
-              {/* Leyenda */}
-              <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                <h4 className="font-medium text-gray-900 mb-2">Leyenda:</h4>
-                <div className="flex flex-wrap gap-4 text-sm">
-                  <div className="flex items-center space-x-2">
-                    <div 
-                      className="w-4 h-4 rounded-full"
-                      style={{ backgroundColor: 'var(--rotaract-blue)' }}
-                    ></div>
-                    <span>Estados con clubes</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div 
-                      className="w-4 h-4 rounded-full"
-                      style={{ backgroundColor: 'var(--rotaract-pink)' }}
-                    ></div>
-                    <span>Estado seleccionado</span>
-                  </div>
+            <MexicoMapComponent
+              selected={selectedState}
+              setSelected={setSelectedState}
+              counts={counts}
+              className="border rounded-lg bg-gradient-to-br from-blue-50 to-pink-50"
+            />
+
+            {/* Leyenda */}
+            <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+              <h4 className="font-medium text-gray-900 mb-2">Leyenda:</h4>
+              <div className="flex flex-wrap gap-4 text-sm">
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: 'var(--rotaract-blue)' }} />
+                  <span>Estados con clubes</span>
                 </div>
-                <p className="text-xs text-gray-600 mt-2">
-                  * El tamaño del círculo representa el número de clubes. Haz clic para filtrar.
-                </p>
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: 'var(--rotaract-pink)' }} />
+                  <span>Estado seleccionado</span>
+                </div>
               </div>
+              <p className="text-xs text-gray-600 mt-2">
+                * El tamaño del círculo representa el número de clubes. Haz clic para filtrar.
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -294,7 +378,7 @@ export default function Clubs() {
             <CardContent className="space-y-4">
               {/* Búsqueda por texto */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <Input
                   placeholder="Buscar por nombre, ciudad o presidente..."
                   value={searchTerm}
@@ -331,7 +415,7 @@ export default function Clubs() {
                 </div>
                 <div className="text-center p-3 bg-yellow-50 rounded-lg">
                   <div className="text-2xl font-bold" style={{ color: 'var(--rotaract-yellow)' }}>
-                    {Object.keys(mexicanStates).length}
+                    {STATE_LIST.filter((s) => counts[s] > 0).length}
                   </div>
                   <div className="text-sm text-gray-600">Estados con clubes</div>
                 </div>
@@ -353,7 +437,7 @@ export default function Clubs() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {filteredClubs.map((club: { id: React.Key | null | undefined; name: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; city: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; address: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; district: any; president: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; email: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; phone: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; members: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; founded: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; points: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; }) => (
+          {filteredClubs.map((club) => (
             <Card key={club.id} className="hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="flex justify-between items-start">
@@ -365,11 +449,12 @@ export default function Clubs() {
                       <MapPin className="w-4 h-4 mr-2" />
                       <span>{club.city}</span>
                     </div>
-                    <div className="text-sm text-gray-500">
-                      {club.address}
-                    </div>
+                    <div className="text-sm text-gray-500">{club.address}</div>
                   </div>
-                  <Badge variant="outline" style={{ borderColor: 'var(--rotaract-blue)', color: 'var(--rotaract-blue)' }}>
+                  <Badge
+                    variant="outline"
+                    style={{ borderColor: 'var(--rotaract-blue)', color: 'var(--rotaract-blue)' }}
+                  >
                     Distrito {club.district}
                   </Badge>
                 </div>
@@ -390,7 +475,7 @@ export default function Clubs() {
                 <div className="space-y-3">
                   <div className="flex items-center space-x-3">
                     <Mail className="w-4 h-4 text-gray-400" />
-                    <a 
+                    <a
                       href={`mailto:${club.email}`}
                       className="hover:underline"
                       style={{ color: 'var(--rotaract-blue)' }}
@@ -400,7 +485,7 @@ export default function Clubs() {
                   </div>
                   <div className="flex items-center space-x-3">
                     <Phone className="w-4 h-4 text-gray-400" />
-                    <a 
+                    <a
                       href={`tel:${club.phone}`}
                       className="hover:underline"
                       style={{ color: 'var(--rotaract-blue)' }}
@@ -434,7 +519,7 @@ export default function Clubs() {
 
                 {/* Botón de Contacto */}
                 <div className="pt-2">
-                  <Button 
+                  <Button
                     className="w-full text-white hover:opacity-90"
                     style={{ backgroundColor: 'var(--rotaract-pink)' }}
                     onClick={() => window.open(`mailto:${club.email}`, '_blank')}
@@ -451,9 +536,7 @@ export default function Clubs() {
           <div className="text-center py-12">
             <MapPin className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-500 text-lg">No se encontraron clubes que coincidan con tu búsqueda.</p>
-            <p className="text-gray-400 text-sm mt-2">
-              Intenta modificar los filtros o términos de búsqueda.
-            </p>
+            <p className="text-gray-400 text-sm mt-2">Intenta modificar los filtros o términos de búsqueda.</p>
           </div>
         )}
       </div>
@@ -468,11 +551,11 @@ export default function Clubs() {
         </CardHeader>
         <CardContent>
           <p className="text-gray-700 mb-4">
-            Si no hay un club Rotaract en tu área o te interesa formar uno nuevo, 
-            contacta con el Distrito correspondiente para obtener información sobre 
+            Si no hay un club Rotaract en tu área o te interesa formar uno nuevo,
+            contacta con el Distrito correspondiente para obtener información sobre
             el proceso de creación de nuevos clubes.
           </p>
-          <Button 
+          <Button
             variant="outline"
             style={{ borderColor: 'var(--rotaract-pink)', color: 'var(--rotaract-pink)' }}
             onClick={() => window.open('mailto:info@rotaract.org', '_blank')}

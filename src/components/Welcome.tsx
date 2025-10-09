@@ -20,7 +20,7 @@ export default function Welcome({ onNavigate }: WelcomeProps) {
       textColor: 'var(--rotaract-pink)'
     },
     {
-      title: 'Ranking de Clubes',
+      title: 'Engrane Challenge',
       description: 'Descubre los clubes más destacados y su clasificación por puntos.',
       icon: Award,
       action: () => onNavigate('ranking'),
@@ -68,6 +68,9 @@ export default function Welcome({ onNavigate }: WelcomeProps) {
               <h1 className="text-4xl lg:text-5xl font-bold text-gray-900">
                 Bienvenido a{' '}
                 <span style={{ color: 'var(--rotaract-pink)' }}>Rotaract</span>
+              </h1>
+              <h1 className="text-4xl lg:text-5xl font-bold text-gray-900">
+                <span style={{ color: 'var(--rotaract-pink)' }}>D. 4185</span>
               </h1>
               <p className="text-xl text-gray-600">
                 Únete a la red global de jóvenes líderes comprometidos con crear 
@@ -223,10 +226,10 @@ export default function Welcome({ onNavigate }: WelcomeProps) {
           </Button>
           <Button 
             size="lg" 
-            variant="outline"
+            variant="secondary"
             onClick={() => onNavigate('contact')}
-            className="border-white text-white hover:bg-white"
-            style={{ ':hover': { color: 'var(--rotaract-pink)' } }}
+            className="bg-white hover:bg-gray-100"
+            style={{ color: 'var(--rotaract-pink)' }}
           >
             Más Información
           </Button>

@@ -2,8 +2,49 @@
 
 import * as React from "react";
 import * as RechartsPrimitive from "recharts";
+import {
+  TooltipProps,
+  LegendProps,
+  // Se eliminan Payload, ValueType y NameType del import ya que no son exportados directamente
+} from "recharts"; 
 
-import { cn } from "./utils";
+// --- Tipos Locales para Recharts (Soluciona TS2305) ---
+// Se definen los tipos internamente ya que el módulo 'recharts' no los exporta directamente en algunos entornos.
+type ValueType = number | string | (number | string)[];
+type NameType = number | string;
+
+// Tipo simplificado de Payload de Recharts (usado en Tooltip y Legend)
+type RechartsPayload = {
+  value?: ValueType;
+  name?: NameType;
+  unit?: string;
+  dataKey?: string | number;
+  payload?: any; // La carga útil completa del punto de datos
+  color?: string;
+  fill?: string;
+  stroke?: string;
+  [key: string]: any;
+};
+
+// --- Inclusión de la función 'cn' para resolver el error de dependencia (y de uso) ---
+// Se actualiza 'cn' para manejar objetos condicionales { 'class': boolean }.
+function cn(...inputs: (string | null | undefined | boolean | Record<string, any>)[]) {
+  let classes = [];
+  for (const input of inputs) {
+    if (typeof input === 'string' && input) {
+      classes.push(input);
+    } else if (typeof input === 'object' && input !== null && !Array.isArray(input)) {
+      // Handle conditional objects { 'class-name': boolean }
+      for (const key in input) {
+        if (input[key]) {
+          classes.push(key);
+        }
+      }
+    }
+  }
+  return classes.join(" ");
+}
+// -------------------------------------------------------------------------------------
 
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = { light: "", dark: ".dark" } as const;
@@ -90,7 +131,7 @@ ${colorConfig
     const color =
       itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
       itemConfig.color;
-    return color ? `  --color-${key}: ${color};` : null;
+    return color ? `  --color-${key}: ${color};` : null;
   })
   .join("\n")}
 }
@@ -104,28 +145,38 @@ ${colorConfig
 
 const ChartTooltip = RechartsPrimitive.Tooltip;
 
-function ChartTooltipContent({
-  active,
-  payload,
-  className,
-  indicator = "dot",
-  hideLabel = false,
-  hideIndicator = false,
-  label,
-  labelFormatter,
-  labelClassName,
-  formatter,
-  color,
-  nameKey,
-  labelKey,
-}: React.ComponentProps<typeof RechartsPrimitive.Tooltip> &
-  React.ComponentProps<"div"> & {
+// Interfaz para definir props de TooltipContent.
+interface ChartTooltipContentProps
+  extends Omit<TooltipProps<ValueType, NameType>, "content"> {
+    // Se añaden explícitamente las props que Recharts pasa a 'content' y que 'Omit' elimina. (Soluciona TS2339)
+    payload?: RechartsPayload[]; 
+    label?: string | number | (string | number)[]; 
+    color?: string; // Color es una prop opcional pasada por Recharts
+    
+    // Props custom
+    className?: string; 
     hideLabel?: boolean;
     hideIndicator?: boolean;
     indicator?: "line" | "dot" | "dashed";
     nameKey?: string;
     labelKey?: string;
-  }) {
+  }
+
+function ChartTooltipContent({
+  active,
+  payload, // Resuelto por la adición a la interfaz
+  className,
+  indicator = "dot",
+  hideLabel = false,
+  hideIndicator = false,
+  label, // Resuelto por la adición a la interfaz
+  labelFormatter,
+  labelClassName,
+  formatter,
+  color, // Resuelto por la adición a la interfaz
+  nameKey,
+  labelKey,
+}: ChartTooltipContentProps) { // Se usa la interfaz dedicada.
   const { config } = useChart();
 
   const tooltipLabel = React.useMemo(() => {
@@ -179,14 +230,15 @@ function ChartTooltipContent({
     >
       {!nestLabel ? tooltipLabel : null}
       <div className="grid gap-1.5">
-        {payload.map((item, index) => {
+        {payload.map((item: RechartsPayload, index: number) => { // Se usa el tipo local RechartsPayload
           const key = `${nameKey || item.name || item.dataKey || "value"}`;
           const itemConfig = getPayloadConfigFromPayload(config, item, key);
-          const indicatorColor = color || item.payload.fill || item.color;
+          // item.payload is generally the entire data object for the point
+          const indicatorColor = color || item.payload?.fill || item.color;
 
           return (
             <div
-              key={item.dataKey}
+              key={item.dataKey || index}
               className={cn(
                 "[&>svg]:text-muted-foreground flex w-full flex-wrap items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5",
                 indicator === "dot" && "items-center",
@@ -257,7 +309,8 @@ function ChartLegendContent({
   verticalAlign = "bottom",
   nameKey,
 }: React.ComponentProps<"div"> &
-  Pick<RechartsPrimitive.LegendProps, "payload" | "verticalAlign"> & {
+  Pick<LegendProps, "verticalAlign"> & { 
+    payload?: RechartsPayload[]; // Se usa el tipo local RechartsPayload
     hideIcon?: boolean;
     nameKey?: string;
   }) {
@@ -275,13 +328,13 @@ function ChartLegendContent({
         className,
       )}
     >
-      {payload.map((item) => {
+      {payload.map((item: RechartsPayload, index: number) => { // 1. Se añade 'index' al map
         const key = `${nameKey || item.dataKey || "value"}`;
         const itemConfig = getPayloadConfigFromPayload(config, item, key);
 
         return (
           <div
-            key={item.value}
+            key={item.dataKey || index} // 2. Se usa 'index' como fallback para la clave. (Soluciona TS2322)
             className={cn(
               "[&>svg]:text-muted-foreground flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3",
             )}
@@ -292,7 +345,7 @@ function ChartLegendContent({
               <div
                 className="h-2 w-2 shrink-0 rounded-[2px]"
                 style={{
-                  backgroundColor: item.color,
+                  backgroundColor: item.color || item.fill,
                 }}
               />
             )}

@@ -167,7 +167,7 @@ export default function Ranking() {
       <div className="text-center space-y-4">
         <div className="flex items-center justify-center space-x-3">
           <Trophy className="w-8 h-8" style={{ color: 'var(--rotaract-pink)' }} />
-          <h1 className="text-4xl font-bold text-gray-900">Ranking de Clubes Rotaract</h1>
+          <h1 className="text-4xl font-bold text-gray-900">Engrane Challenge</h1>
         </div>
         <p className="text-xl text-gray-600 max-w-3xl mx-auto">
           Clasificación oficial basada en puntos obtenidos por actividades de servicio, 
@@ -185,6 +185,7 @@ export default function Ranking() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+             {/*
             <div>
               <label className="block text-sm font-medium mb-2">Filtrar por Distrito</label>
               <Select value={filterBy} onValueChange={setFilterBy}>
@@ -201,6 +202,7 @@ export default function Ranking() {
                 </SelectContent>
               </Select>
             </div>
+            */}
             <div>
               <label className="block text-sm font-medium mb-2">Ordenar por</label>
               <Select value={sortBy} onValueChange={setSortBy}>
@@ -373,7 +375,7 @@ export default function Ranking() {
 
           <div className="mt-4 p-4 bg-white rounded-lg border">
             <p className="text-sm text-gray-600">
-              <strong>Período de evaluación:</strong> El ranking se actualiza trimestralmente 
+              <strong>Período de evaluación:</strong> Los engranes se actualiza trimestralmente 
               basándose en las actividades reportadas durante los últimos 12 meses.
             </p>
           </div>

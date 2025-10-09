@@ -4,8 +4,58 @@ import * as React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DayPicker } from "react-day-picker";
 
-import { cn } from "./utils";
-import { buttonVariants } from "./button";
+// --- Definición Local de 'cn' (Resuelve ERROR: Could not resolve "./utils") ---
+type ClassValue = string | null | undefined | boolean | Record<string, any>;
+
+function cn(...inputs: ClassValue[]) {
+  let classes = [];
+  for (const input of inputs) {
+    if (typeof input === 'string' && input) {
+      classes.push(input);
+    } else if (typeof input === 'object' && input !== null && !Array.isArray(input)) {
+      for (const key in input) {
+        if (input[key]) {
+          classes.push(key);
+        }
+      }
+    }
+  }
+  return classes.join(" ");
+}
+// ----------------------------------------------------------------------------------
+
+// --- Definición Local de 'buttonVariants' (Resuelve ERROR: Could not resolve "./button") ---
+// Simulamos las variantes de un componente de botón común basado en Tailwind.
+interface ButtonVariantsProps {
+    variant: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
+    size?: 'default' | 'sm' | 'lg' | 'icon';
+}
+
+function buttonVariants({ variant, size = 'default' }: ButtonVariantsProps): string {
+  const baseClasses = "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50";
+
+  const sizeClasses = {
+    default: "h-9 px-4 py-2",
+    sm: "h-8 rounded-md px-3 text-xs",
+    lg: "h-10 rounded-md px-8",
+    icon: "h-9 w-9",
+  }[size];
+
+  const variantClasses = {
+    default: "bg-primary text-primary-foreground shadow hover:bg-primary/90",
+    destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
+    outline: "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
+    secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
+    ghost: "hover:bg-accent hover:text-accent-foreground",
+    link: "text-primary underline-offset-4 hover:underline",
+  }[variant];
+
+  return cn(baseClasses, sizeClasses, variantClasses);
+}
+// ----------------------------------------------------------------------------------
+
+// Se define la interfaz de props para los iconos, ya que 'react-day-picker' usa genéricos
+type IconProps = React.ComponentProps<"svg">;
 
 function Calendar({
   className,
@@ -59,14 +109,18 @@ function Calendar({
         day_hidden: "invisible",
         ...classNames,
       }}
-      components={{
-        IconLeft: ({ className, ...props }) => (
-          <ChevronLeft className={cn("size-4", className)} {...props} />
-        ),
-        IconRight: ({ className, ...props }) => (
-          <ChevronRight className={cn("size-4", className)} {...props} />
-        ),
-      }}
+      components={
+        {
+          // Usamos IconPrevious/IconNext (los nombres correctos de la librería)
+          // y forzamos el tipo 'as any' para evitar el conflicto con la definición de 'CustomComponents' (TS2322)
+          IconPrevious: ({ className, ...props }: IconProps) => (
+            <ChevronLeft className={cn("size-4", className)} {...props} />
+          ),
+          IconNext: ({ className, ...props }: IconProps) => (
+            <ChevronRight className={cn("size-4", className)} {...props} />
+          ),
+        } as any
+      }
       {...props}
     />
   );
