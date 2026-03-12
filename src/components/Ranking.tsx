@@ -571,7 +571,7 @@ export default function Ranking() {
         </Card>
       )}
 
-      {/* Info sistema de puntuación */}
+      {/* Info sistema de puntuación 
       <Card className="bg-gradient-to-r from-pink-50 to-yellow-50 border-pink-200">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
@@ -593,7 +593,7 @@ export default function Ranking() {
             <code className="bg-gray-200 px-1 rounded">{'{ clubs, scores }'}</code>.
           </p>
         </CardContent>
-      </Card>
+      </Card>*/}
     </div>
   );
 }

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { ArrowLeft, Calendar, User, Heart, MessageCircle, Share2, Edit, Flag, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -31,31 +32,51 @@ interface PostDetailProps {
   isLoggedIn: boolean;
 }
 
+const WP_API = process.env.REACT_APP_WORDPRESS_API || '';
+
 export default function PostDetail({ post, onBack, currentUser, isLoggedIn }: PostDetailProps) {
   const [newComment, setNewComment] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [commentsLoading, setCommentsLoading] = useState(false);
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(post.likes);
-  const [commentsData, setCommentsData] = useState([
-    {
-      id: 1,
-      author: 'Ana García',
-      authorAvatar: 'AG',
-      club: 'Rotaract Club México Centro',
-      content: '¡Excelente proyecto! Nos inspira para hacer algo similar en nuestro club.',
-      date: '2024-03-16',
-      likes: 3
-    },
-    {
-      id: 2,
-      author: 'Roberto Martínez',
-      authorAvatar: 'RM',
-      club: 'Rotaract Club Puebla',
-      content: 'Felicidades por el impacto positivo en la comunidad. ¿Tienen planeado repetir la actividad?',
-      date: '2024-03-16',
-      likes: 1
-    }
-  ]);
+  const [commentsData, setCommentsData] = useState<Array<{
+    id: number;
+    author: string;
+    authorAvatar: string;
+    club: string;
+    content: string;
+    date: string;
+    likes: number;
+  }>>([]);
+
+  useEffect(() => {
+    if (!post.wpId || !WP_API) return;
+
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setCommentsLoading(true);
+    });
+    axios.get(`${WP_API}/comments?post=${post.wpId}&per_page=50&_embed`)
+      .then((res) => {
+        if (cancelled) return;
+        const list = (res.data || []).map((c: any) => ({
+          id: c.id,
+          author: c.author_name || 'Anónimo',
+          authorAvatar: (c.author_name || 'A').split(' ').map((n: string) => n[0]).join('').slice(0, 2),
+          club: c.meta?.rotaract_club || '',
+          content: (c.content?.rendered || '').replace(/<[^>]+>/g, ''),
+          date: c.date,
+          likes: 0
+        }));
+        setCommentsData(list);
+      })
+      .catch(() => { if (!cancelled) setCommentsData([]); })
+      .finally(() => { if (!cancelled) setCommentsLoading(false); });
+
+    return () => { cancelled = true; };
+  }, [post.wpId]);
 
   const handleLike = () => {
     if (!isLoggedIn) return;
@@ -72,25 +93,54 @@ export default function PostDetail({ post, onBack, currentUser, isLoggedIn }: Po
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim() || !isLoggedIn) return;
-
     setIsSubmittingComment(true);
-    
-    // Simulación de envío de comentario
-    setTimeout(() => {
-      const comment = {
+    const token = localStorage.getItem('rotaract_jwt');
+    if (post.wpId && WP_API && token) {
+      try {
+        const res = await axios.post(
+          `${WP_API}/comments`,
+          {
+            post: post.wpId,
+            content: newComment,
+            author_name: currentUser?.name,
+            meta: { rotaract_club: currentUser?.club || '' }
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const c = res.data;
+        setCommentsData(prev => [...prev, {
+          id: c.id,
+          author: c.author_name || currentUser?.name || 'Tú',
+          authorAvatar: currentUser?.avatar || 'T',
+          club: currentUser?.club || '',
+          content: (c.content?.rendered || newComment).replace(/<[^>]+>/g, ''),
+          date: c.date,
+          likes: 0
+        }]);
+      } catch {
+        setCommentsData(prev => [...prev, {
+          id: Date.now(),
+          author: currentUser?.name || 'Tú',
+          authorAvatar: currentUser?.avatar || 'T',
+          club: currentUser?.club || '',
+          content: newComment,
+          date: new Date().toISOString().split('T')[0],
+          likes: 0
+        }]);
+      }
+    } else {
+      setCommentsData(prev => [...prev, {
         id: Date.now(),
-        author: currentUser.name,
-        authorAvatar: currentUser.avatar,
-        club: currentUser.club,
+        author: currentUser?.name || 'Tú',
+        authorAvatar: currentUser?.avatar || 'T',
+        club: currentUser?.club || '',
         content: newComment,
         date: new Date().toISOString().split('T')[0],
         likes: 0
-      };
-      
-      setCommentsData([...commentsData, comment]);
-      setNewComment('');
-      setIsSubmittingComment(false);
-    }, 1000);
+      }]);
+    }
+    setNewComment('');
+    setIsSubmittingComment(false);
   };
 
   const formatDate = (dateString: string) => {
@@ -307,7 +357,13 @@ export default function PostDetail({ post, onBack, currentUser, isLoggedIn }: Po
 
         {/* Lista de comentarios */}
         <div className="space-y-4">
-          {commentsData.map((comment) => (
+          {commentsLoading && (
+            <p className="text-sm text-gray-500">Cargando comentarios...</p>
+          )}
+          {!commentsLoading && commentsData.length === 0 && (
+            <p className="text-sm text-gray-500">Aún no hay comentarios. ¡Sé el primero en comentar!</p>
+          )}
+          {!commentsLoading && commentsData.map((comment) => (
             <Card key={comment.id}>
               <CardContent className="p-6">
                 <div className="flex items-start space-x-4">

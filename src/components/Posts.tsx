@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Plus, Calendar, User, Heart, MessageCircle, Share2, Search, Filter, LogIn, UserPlus, Upload, Eye } from 'lucide-react';
+import { Plus, Calendar, User, Heart, MessageCircle, Share2, Search, Filter, Upload, Eye, ImagePlus, Video } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -8,12 +8,14 @@ import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Separator } from './ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
-import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Alert, AlertDescription } from './ui/alert';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import PostDetail from './PostDetail';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
+import { toast } from 'sonner';
 
 // Mock de configuración de WordPress API
 const WORDPRESS_CONFIG = {
@@ -29,7 +31,6 @@ export default function Posts() {
   const [posts, setPosts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showCreatePost, setShowCreatePost] = useState(false);
-  const [showLogin, setShowLogin] = useState(false);
   const [selectedPost, setSelectedPost] = useState<any>(null);
   const [viewMode, setViewMode] = useState<'list' | 'detail'>('list');
 
@@ -94,11 +95,9 @@ export default function Posts() {
     { id: 'Educación', label: 'Educación', slug: 'educacion' }
   ];
 
-  // Inicializar posts
- useEffect(() => {
+  // Inicializar posts y usuario
+  useEffect(() => {
     loadPostsFromWordPress();
-    
-    // Verificar si hay usuario guardado en localStorage
     const savedUser = localStorage.getItem('rotaract_user');
     if (savedUser) {
       try {
@@ -112,6 +111,14 @@ export default function Posts() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Abrir modal "Crear post" si se llegó desde el panel Admin
+  useEffect(() => {
+    if (isLoggedIn && sessionStorage.getItem('openCreatePost')) {
+      sessionStorage.removeItem('openCreatePost');
+      setShowCreatePost(true);
+    }
+  }, [isLoggedIn]);
 
   // Función para cargar posts desde WordPress API
   const loadPostsFromWordPress = async () => {
@@ -141,11 +148,35 @@ export default function Posts() {
     }
     setIsLoading(false);
   };
+  // Función para subir medio (imagen/video) a WordPress
+  const uploadMediaToWordPress = async (file: File): Promise<{ url: string; id: number } | null> => {
+    try {
+      const jwtToken = localStorage.getItem('rotaract_jwt');
+      if (!jwtToken) return null;
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await axios.post(
+        `${WORDPRESS_CONFIG.apiUrl}/media`,
+        formData,
+        {
+          headers: {
+            'Content-Disposition': `attachment; filename="${file.name}"`,
+            'Authorization': `Bearer ${jwtToken}`
+          }
+        }
+      );
+      return { url: response.data.source_url, id: response.data.id };
+    } catch (error) {
+      console.error('Error uploading media to WordPress:', error);
+      return null;
+    }
+  };
+
   // Función para crear post en WordPress
   const createPostInWordPress = async (postData: any) => {
     try {
       const jwtToken = localStorage.getItem('rotaract_jwt');
-      const wpPostData = {
+      const wpPostData: Record<string, unknown> = {
         title: postData.title,
         content: postData.content,
         status: 'draft',
@@ -155,6 +186,9 @@ export default function Posts() {
           rotaract_author: postData.author
         }
       };
+      if (postData.featuredMediaId) {
+        wpPostData.featured_media = postData.featuredMediaId;
+      }
       const response = await axios.post(
         `${WORDPRESS_CONFIG.apiUrl}/posts`,
         wpPostData,
@@ -227,56 +261,14 @@ export default function Posts() {
     setViewMode('list');
   };
 
-  const LoginForm = () => {
-    const [credentials, setCredentials] = useState({ username: '', password: '' });
-    const [isAuthenticating, setIsAuthenticating] = useState(false);
-
-    const handleLogin = async (e: React.FormEvent) => {
-      e.preventDefault();
-      setIsAuthenticating(true);
-      try {
-        await authenticateWithWordPress(credentials.username, credentials.password);
-        setShowLogin(false);
-      } catch (error) {
-        alert('Error de autenticación. Verifica tus credenciales.');
-      }
-      setIsAuthenticating(false);
-    };
-
-    return (
-      <form onSubmit={handleLogin} className="space-y-4">
-        <div>
-          <Label htmlFor="username">Usuario</Label>
-          <Input
-            id="username"
-            type="text"
-            value={credentials.username}
-            onChange={(e) => setCredentials({...credentials, username: e.target.value})}
-            placeholder="Tu usuario de WordPress"
-            required
-          />
-        </div>
-        <div>
-          <Label htmlFor="password">Contraseña</Label>
-          <Input
-            id="password"
-            type="password"
-            value={credentials.password}
-            onChange={(e) => setCredentials({...credentials, password: e.target.value})}
-            placeholder="Tu contraseña"
-            required
-          />
-        </div>
-        <Button 
-          type="submit" 
-          className="w-full" 
-          disabled={isAuthenticating}
-          style={{ backgroundColor: 'var(--rotaract-pink)' }}
-        >
-          {isAuthenticating ? 'Iniciando sesión...' : 'Iniciar Sesión'}
-        </Button>
-      </form>
-    );
+  const quillModules = {
+    toolbar: [
+      [{ header: [1, 2, 3, false] }],
+      ['bold', 'italic', 'underline', 'strike'],
+      [{ list: 'ordered' }, { list: 'bullet' }],
+      ['link'],
+      ['clean']
+    ]
   };
 
   const CreatePostForm = () => {
@@ -284,14 +276,44 @@ export default function Posts() {
       title: '',
       content: '',
       category: '',
-      image: ''
+      image: '',
+      featuredMediaId: 0 as number
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [uploadingFile, setUploadingFile] = useState(false);
+    const quillRef = useRef<ReactQuill>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files?.length) return;
+      setUploadingFile(true);
+      const quill = quillRef.current?.getEditor();
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const isVideo = file.type.startsWith('video/');
+        const isImage = file.type.startsWith('image/');
+        if (!isImage && !isVideo) continue;
+        const result = await uploadMediaToWordPress(file);
+        if (result && quill) {
+          const range = quill.getSelection(true);
+          if (isImage) {
+            quill.insertEmbed(range?.index ?? quill.getLength(), 'image', result.url);
+          } else {
+            quill.insertText(range?.index ?? quill.getLength(), `\n[Video: ${result.url}]\n`, 'link', result.url);
+          }
+          if (!newPost.featuredMediaId && isImage) {
+            setNewPost(prev => ({ ...prev, featuredMediaId: result.id, image: result.url }));
+          }
+        }
+      }
+      setUploadingFile(false);
+      e.target.value = '';
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       setIsSubmitting(true);
-      
       try {
         const postData = {
           ...newPost,
@@ -303,20 +325,14 @@ export default function Posts() {
           comments: 0,
           shares: 0
         };
-
         await createPostInWordPress(postData);
-        
-        // Agregar al estado local (en producción se recargarían desde WordPress)
         setPosts([{ id: Date.now(), ...postData, status: 'pending' }, ...posts]);
-        
-        setNewPost({ title: '', content: '', category: '', image: '' });
+        setNewPost({ title: '', content: '', category: '', image: '', featuredMediaId: 0 });
         setShowCreatePost(false);
-        
-        alert('Post enviado para revisión. Será publicado después de la moderación.');
+        toast.success('Post enviado para revisión. Será publicado después de la moderación.');
       } catch (error) {
-        alert('Error al crear el post. Inténtalo de nuevo.');
+        toast.error('Error al crear el post. Inténtalo de nuevo.');
       }
-      
       setIsSubmitting(false);
     };
 
@@ -327,17 +343,16 @@ export default function Posts() {
           <Input
             id="title"
             value={newPost.title}
-            onChange={(e) => setNewPost({...newPost, title: e.target.value})}
+            onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
             placeholder="Escribe un título atractivo"
             required
           />
         </div>
-        
         <div>
           <Label htmlFor="category">Categoría</Label>
-          <Select 
-            value={newPost.category} 
-            onValueChange={(value: any) => setNewPost({...newPost, category: value})}
+          <Select
+            value={newPost.category}
+            onValueChange={(value: string) => setNewPost({ ...newPost, category: value })}
           >
             <SelectTrigger>
               <SelectValue placeholder="Selecciona una categoría" />
@@ -351,34 +366,70 @@ export default function Posts() {
             </SelectContent>
           </Select>
         </div>
-
         <div>
-          <Label htmlFor="content">Contenido</Label>
-          <Textarea
-            id="content"
-            value={newPost.content}
-            onChange={(e) => setNewPost({...newPost, content: e.target.value})}
-            placeholder="Describe tu proyecto, actividad o noticia..."
-            rows={6}
-            required
-          />
+          <Label>Contenido</Label>
+          <div className="rounded-md border bg-white">
+            <ReactQuill
+              ref={quillRef}
+              theme="snow"
+              value={newPost.content}
+              onChange={(content) => setNewPost({ ...newPost, content })}
+              modules={quillModules}
+              placeholder="Describe tu proyecto, actividad o noticia..."
+              className="min-h-[200px]"
+            />
+          </div>
         </div>
-
+        <div className="space-y-2">
+          <Label>Imágenes y videos</Label>
+          <div className="flex flex-wrap gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,video/*"
+              multiple
+              className="hidden"
+              onChange={handleFileSelect}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingFile}
+            >
+              <ImagePlus className="w-4 h-4 mr-2" />
+              {uploadingFile ? 'Subiendo...' : 'Subir imagen'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingFile}
+            >
+              <Video className="w-4 h-4 mr-2" />
+              Subir video
+            </Button>
+          </div>
+          <p className="text-xs text-gray-500">
+            Las imágenes se insertan en el texto; la primera será la portada del post.
+          </p>
+        </div>
         <div>
-          <Label htmlFor="image">URL de Imagen (opcional)</Label>
+          <Label htmlFor="image">URL de imagen de portada (opcional)</Label>
           <Input
             id="image"
             type="url"
             value={newPost.image}
-            onChange={(e) => setNewPost({...newPost, image: e.target.value})}
+            onChange={(e) => setNewPost({ ...newPost, image: e.target.value })}
             placeholder="https://ejemplo.com/imagen.jpg"
           />
         </div>
-
-        <Button 
-          type="submit" 
-          className="w-full" 
-          disabled={isSubmitting}
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={isSubmitting || !newPost.content.trim()}
           style={{ backgroundColor: 'var(--rotaract-pink)' }}
         >
           {isSubmitting ? 'Enviando...' : 'Enviar Post para Revisión'}
@@ -413,65 +464,41 @@ export default function Posts() {
         </p>
       </div>
 
-      {/* Sistema de Autenticación */}
-      {!isLoggedIn ? (
-        <Alert className="bg-gradient-to-r from-pink-50 to-blue-50 border-pink-200">
-          <LogIn className="h-4 w-4" />
-          <AlertDescription className="flex items-center justify-between">
-            <span>Inicia sesión para crear y gestionar tus posts</span>
-            <div className="flex space-x-2">
-              <Dialog open={showLogin} onOpenChange={setShowLogin}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <LogIn className="w-4 h-4 mr-2" />
-                    Iniciar Sesión
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Iniciar Sesión</DialogTitle>
-                    <DialogDescription>
-                      Usa tus credenciales de WordPress para acceder
-                    </DialogDescription>
-                  </DialogHeader>
-                  <LoginForm />
-                </DialogContent>
-              </Dialog>
-              {/* Sistema de Autenticación
-              <Button variant="outline" size="sm">
-                <UserPlus className="w-4 h-4 mr-2" />
-                Registrarse
-              </Button>
-              */}
+      {/* Barra de usuario cuando está logueado */}
+      {isLoggedIn && (
+        <div className="rounded-xl border border-green-200 bg-gradient-to-r from-green-50 to-blue-50 px-4 py-3 flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center" style={{ color: 'var(--rotaract-blue)' }}>
+              <User className="w-5 h-5" />
             </div>
-          </AlertDescription>
-        </Alert>
-      ) : (
-        <Alert className="bg-gradient-to-r from-green-50 to-blue-50 border-green-200">
-          <User className="h-4 w-4" />
-          <AlertDescription className="flex items-center justify-between">
-            <span>Bienvenido, {currentUser.name} de {currentUser.club}</span>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => {
-                setIsLoggedIn(false);
-                setCurrentUser(null);
-                localStorage.removeItem('rotaract_user');
-              }}
-            >
-              Cerrar Sesión
-            </Button>
-          </AlertDescription>
-        </Alert>
+            <p className="text-sm font-medium text-gray-800 truncate">
+              Bienvenido, <span className="font-semibold">{currentUser?.name ?? 'Usuario'}</span>
+              {currentUser?.club ? (
+                <span className="text-gray-600 font-normal"> de {currentUser.club}</span>
+              ) : null}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-shrink-0 border-green-300 text-gray-700 hover:bg-green-100"
+            onClick={() => {
+              setIsLoggedIn(false);
+              setCurrentUser(null);
+              localStorage.removeItem('rotaract_user');
+            }}
+          >
+            Cerrar Sesión
+          </Button>
+        </div>
       )}
 
       {/* Herramientas de Búsqueda y Filtros */}
       <Card className="bg-gradient-to-r from-pink-50 to-blue-50 border-pink-200">
-        <CardContent className="p-6 space-y-4">
-          <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
+        <CardContent className="p-6">
+          <div className="flex flex-wrap items-center gap-4">
             {/* Búsqueda */}
-            <div className="relative w-full lg:w-96">
+            <div className="relative min-w-0 flex-1 sm:max-w-xs lg:max-w-sm">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <Input
                 placeholder="Buscar posts, autores o clubes..."
@@ -481,12 +508,30 @@ export default function Posts() {
               />
             </div>
 
+            {/* Filtros por Categoría (al lado de la búsqueda) */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Filter className="w-4 h-4 text-gray-500 flex-shrink-0" />
+              <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Categorías:</span>
+              {categories.map((category) => (
+                <Button
+                  key={category.id}
+                  variant={selectedCategory === category.id ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSelectedCategory(category.id)}
+                  className={selectedCategory === category.id ? 'text-white' : ''}
+                  style={selectedCategory === category.id ? { backgroundColor: 'var(--rotaract-pink)' } : {}}
+                >
+                  {category.label}
+                </Button>
+              ))}
+            </div>
+
             {/* Botones de acción */}
-            <div className="flex space-x-2">
+            <div className="flex space-x-2 ml-auto">
               {isLoggedIn && (
                 <Dialog open={showCreatePost} onOpenChange={setShowCreatePost}>
                   <DialogTrigger asChild>
-                    <Button 
+                    <Button
                       className="text-white whitespace-nowrap"
                       style={{ backgroundColor: 'var(--rotaract-pink)' }}
                     >
@@ -505,32 +550,8 @@ export default function Posts() {
                   </DialogContent>
                 </Dialog>
               )}
-              
-              <Button variant="outline">
-                <Eye className="w-4 h-4 mr-2" />
-                Vista Previa
-              </Button>
-            </div>
-          </div>
 
-          {/* Filtros por Categoría */}
-          <div className="flex flex-wrap gap-2">
-            <div className="flex items-center space-x-2 mr-4">
-              <Filter className="w-4 h-4 text-gray-500" />
-              <span className="text-sm font-medium text-gray-700">Categorías:</span>
             </div>
-            {categories.map((category) => (
-              <Button
-                key={category.id}
-                variant={selectedCategory === category.id ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setSelectedCategory(category.id)}
-                className={selectedCategory === category.id ? 'text-white' : ''}
-                style={selectedCategory === category.id ? { backgroundColor: 'var(--rotaract-pink)' } : {}}
-              >
-                {category.label}
-              </Button>
-            ))}
           </div>
         </CardContent>
       </Card>

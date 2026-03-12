@@ -45,6 +45,15 @@ const ALIASES: Record<string, StateKey> = {
   'mxgro': 'Guerrero',
 };
 
+/** Centroides fijos para viewBox 0 0 1000 630 (mx.svg). Se usan si el SVG no expone name/id por estado. */
+const FALLBACK_CENTROIDS: Record<StateKey, { x: number; y: number }> = {
+  Veracruz: { x: 760, y: 355 },
+  Puebla: { x: 650, y: 320 },
+  Tlaxcala: { x: 662, y: 298 },
+  Morelos: { x: 618, y: 358 },
+  Guerrero: { x: 558, y: 438 },
+};
+
 /** Intenta inferir el nombre del estado a partir de atributos típicos del path */
 function inferStateKey(el: Element): StateKey | null {
   const candidates = [
@@ -106,8 +115,8 @@ export default function MexicoMap({
     const svg: SVGSVGElement | null = root.querySelector('svg');
     if (!svg) return;
 
-    // viewBox del SVG original (setState en microtask para evitar set-state síncrono en effect)
-    const vb = svg.getAttribute('viewBox') || '0 0 1000 640';
+    // viewBox del SVG original (mx.svg usa 0 0 1000 630)
+    const vb = svg.getAttribute('viewBox') || '0 0 1000 630';
     queueMicrotask(() => setViewBox(vb));
 
     // Selecciona shapes candidatos a estado
@@ -184,8 +193,10 @@ export default function MexicoMap({
 
     (Object.keys(counts) as StateKey[]).forEach((st) => {
       const c = counts[st] || 0;
-      const center = centers[st];
-      if (!center || c <= 0) return;
+      if (c <= 0) return;
+      // Usar centro del SVG si existe, si no centroide fijo para viewBox 1000x630
+      const center = centers[st] ?? FALLBACK_CENTROIDS[st];
+      if (!center) return;
       items.push({
         key: st,
         x: center.x,
@@ -200,9 +211,9 @@ export default function MexicoMap({
 
 
   return (
-    <div ref={containerRef} className={className}>
-      {/* SVGR */}
-      <MexicoSVG className="w-full h-auto select-none" />
+    <div ref={containerRef} className={`relative ${className ?? ''}`}>
+      {/* SVGR - mapa base */}
+      <MexicoSVG className="w-full h-auto select-none block" />
 
       {/* Fallback si usaras raw string:
       <div
@@ -211,9 +222,13 @@ export default function MexicoMap({
       />
       */}
 
-      {/* Capa overlay para círculos/labels en el mismo viewBox */}
+      {/* Capa overlay: misma viewBox, posición absoluta para alinear pines con el mapa */}
       {viewBox && (
-        <svg viewBox={viewBox} className="w-full h-auto pointer-events-none -mt-[0.001px]">
+        <svg
+          viewBox={viewBox}
+          className="absolute inset-0 w-full h-full pointer-events-none"
+          preserveAspectRatio="xMidYMid meet"
+        >
           {overlayCircles.map(({ key, x, y, r, count }) => {
             const isActive = selected === key;
             return (

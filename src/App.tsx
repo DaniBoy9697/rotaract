@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
+import { Toaster } from 'sonner';
+import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, Users, Award, Calendar, FileText, Shield, Mail, Home, Trophy } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Separator } from './components/ui/separator';
 
-// Componentes de página
 import Welcome from './components/Welcome';
 import Clubs from './components/Clubs';
 import Ranking from './components/Ranking';
@@ -12,6 +13,7 @@ import WorldWeek from './components/WorldWeek';
 import Posts from './components/Posts';
 import Privacy from './components/Privacy';
 import Contact from './components/Contact';
+import Admin from './components/Admin';
 
 const navigationItems = [
   { id: 'welcome', label: 'Bienvenida', icon: Home },
@@ -24,9 +26,17 @@ const navigationItems = [
   { id: 'contact', label: 'Contacto', icon: Mail },
 ];
 
-export default function App() {
-  const [currentPage, setCurrentPage] = useState('welcome');
+function AppLayout() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const path = location.pathname.replace(/^\/+/, '') || 'welcome';
+  const currentPage = path === '' ? 'welcome' : path;
+
+  const setCurrentPage = (id: string) => {
+    navigate(id === 'welcome' ? '/' : `/${id}`);
+    setMobileMenuOpen(false);
+  };
 
   const renderCurrentPage = () => {
     switch (currentPage) {
@@ -135,6 +145,8 @@ export default function App() {
         {renderCurrentPage()}
       </main>
 
+      <Toaster position="bottom-right" richColors closeButton />
+
       {/* Footer */}
       <footer className="text-white mt-12" style={{ backgroundColor: 'var(--rotaract-pink-dark)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -205,5 +217,17 @@ export default function App() {
         </div>
       </footer>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <>
+      <Routes>
+        <Route path="/admin" element={<Admin />} />
+        <Route path="*" element={<AppLayout />} />
+      </Routes>
+      <Toaster position="bottom-right" richColors closeButton />
+    </>
   );
 }
