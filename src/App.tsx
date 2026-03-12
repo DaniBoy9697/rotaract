@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { Menu, X, Users, Award, Calendar, FileText, Shield, Mail, Home, Trophy } from 'lucide-react';
 import { Button } from './components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
-import { Badge } from './components/ui/badge';
 import { Separator } from './components/ui/separator';
 
 // Componentes de página
@@ -32,24 +30,24 @@ export default function App() {
 
   const renderCurrentPage = () => {
     switch (currentPage) {
-      case 'welcome':
-        return <Welcome onNavigate={setCurrentPage} />;
-      case 'clubs':
-        return <Clubs />;
-      case 'ranking':
-        return <Ranking />;
-      case 'awards':
-        return <Awards />;
-      case 'worldweek':
-        return <WorldWeek />;
-      case 'posts':
-        return <Posts />;
-      case 'privacy':
-        return <Privacy />;
-      case 'contact':
-        return <Contact />;
-      default:
-        return <Welcome onNavigate={setCurrentPage} />;
+    case 'welcome':
+      return <Welcome onNavigate={setCurrentPage} />;
+    case 'clubs':
+      return <Clubs />;
+    case 'ranking':
+      return <Ranking />;
+    case 'awards':
+      return <Awards />;
+    case 'worldweek':
+      return <WorldWeek />;
+    case 'posts':
+      return <Posts />;
+    case 'privacy':
+      return <Privacy />;
+    case 'contact':
+      return <Contact />;
+    default:
+      return <Welcome onNavigate={setCurrentPage} />;
     }
   };
 

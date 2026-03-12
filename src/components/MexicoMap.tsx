@@ -106,9 +106,9 @@ export default function MexicoMap({
     const svg: SVGSVGElement | null = root.querySelector('svg');
     if (!svg) return;
 
-    // viewBox del SVG original
+    // viewBox del SVG original (setState en microtask para evitar set-state síncrono en effect)
     const vb = svg.getAttribute('viewBox') || '0 0 1000 640';
-    setViewBox(vb);
+    queueMicrotask(() => setViewBox(vb));
 
     // Selecciona shapes candidatos a estado
     const shapeSel = 'path, polygon, polyline';
@@ -146,8 +146,10 @@ export default function MexicoMap({
       }
     });
 
-    setCenters(newCenters);
-    setPathByState(newPaths);
+    queueMicrotask(() => {
+      setCenters(newCenters);
+      setPathByState(newPaths);
+    });
 
     // Limpieza (remover listeners si se desmonta o cambia el svg)
     return () => {
