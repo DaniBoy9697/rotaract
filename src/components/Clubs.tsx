@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import MexicoMapComponent from './MexicoMap';
-import { Search, MapPin, Phone, Mail, User, Building2, Calendar } from 'lucide-react';
+import { Search, MapPin, Phone, Mail, User, Building2, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
@@ -33,6 +33,8 @@ type MexicoMapProps = {
 };
 
 const STATE_LIST: StateKey[] = ['Veracruz', 'Morelos', 'Tlaxcala', 'Puebla', 'Guerrero'];
+
+const CLUBS_PER_PAGE = 12;
 
 /**
  * Mapa SVG minimalista de México con 5 estados como paths clicables.
@@ -188,6 +190,16 @@ function Legend({ totalStates }: { totalStates: number }) {
 export default function Clubs() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedState, setSelectedState] = useState<StateKey | ''>('');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    setCurrentPage(1);
+  };
+  const handleStateChange = (value: React.SetStateAction<StateKey | ''>) => {
+    setSelectedState(value);
+    setCurrentPage(1);
+  };
 
   // ====== DATA MOCK ======
   const clubsByState: ClubsByState = {
@@ -308,7 +320,7 @@ export default function Clubs() {
     );
   }, [allClubs, clubsByState, selectedState, searchTerm]);
 
- const counts: Record<StateKey, number> = useMemo(() => {
+  const counts: Record<StateKey, number> = useMemo(() => {
     return {
       Veracruz: clubsByState.Veracruz?.length || 0,
       Morelos: clubsByState.Morelos?.length || 0,
@@ -317,6 +329,14 @@ export default function Clubs() {
       Guerrero: clubsByState.Guerrero?.length || 0,
     };
   }, [clubsByState]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredClubs.length / CLUBS_PER_PAGE));
+  const paginatedClubs = useMemo(() => {
+    const start = (currentPage - 1) * CLUBS_PER_PAGE;
+    return filteredClubs.slice(start, start + CLUBS_PER_PAGE);
+  }, [filteredClubs, currentPage]);
+  const from = (currentPage - 1) * CLUBS_PER_PAGE + 1;
+  const to = Math.min(currentPage * CLUBS_PER_PAGE, filteredClubs.length);
 
   return (
     <div className="space-y-8">
@@ -344,7 +364,7 @@ export default function Clubs() {
           <CardContent>
             <MexicoMapComponent
               selected={selectedState}
-              setSelected={setSelectedState}
+              setSelected={handleStateChange}
               counts={counts}
               className="border rounded-lg bg-gradient-to-br from-blue-50 to-pink-50"
             />
@@ -382,7 +402,7 @@ export default function Clubs() {
                 <Input
                   placeholder="Buscar por nombre, ciudad o presidente..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => handleSearchChange(e.target.value)}
                   className="pl-10"
                 />
               </div>
@@ -397,7 +417,7 @@ export default function Clubs() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setSelectedState('')}
+                    onClick={() => handleStateChange('')}
                     className="text-pink-700 hover:text-pink-800"
                   >
                     Limpiar filtro
@@ -422,6 +442,30 @@ export default function Clubs() {
               </div>
             </CardContent>
           </Card>
+
+          {/* ¿Quieres formar un nuevo club? — debajo del filtrado */}
+          <Card className="bg-gradient-to-r from-pink-50 to-blue-50 border-pink-200">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Calendar className="w-5 h-5" style={{ color: 'var(--rotaract-pink)' }} />
+                <span>¿Quieres formar un nuevo club?</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-700 mb-4">
+                Si no hay un club Rotaract en tu área o te interesa formar uno nuevo,
+                contacta con el Distrito correspondiente para obtener información sobre
+                el proceso de creación de nuevos clubes.
+              </p>
+              <Button
+                variant="outline"
+                style={{ borderColor: 'var(--rotaract-pink)', color: 'var(--rotaract-pink)' }}
+                onClick={() => window.open('mailto:info@rotaract.org', '_blank')}
+              >
+                Contactar para Formar Club
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
@@ -437,7 +481,7 @@ export default function Clubs() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {filteredClubs.map((club) => (
+          {paginatedClubs.map((club) => (
             <Card key={club.id} className="hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="flex justify-between items-start">
@@ -498,7 +542,7 @@ export default function Clubs() {
                 <Separator />
 
                 {/* Estadísticas */}
-                <div className="grid grid-cols-3 gap-4 text-center">
+                <div className="grid grid-cols-2 gap-4 text-center">
                   <div>
                     <p className="text-2xl font-bold" style={{ color: 'var(--rotaract-blue)' }}>
                       {club.members}
@@ -508,12 +552,6 @@ export default function Clubs() {
                   <div>
                     <p className="text-2xl font-bold text-green-600">{club.founded}</p>
                     <p className="text-sm text-gray-600">Fundado</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold" style={{ color: 'var(--rotaract-yellow)' }}>
-                      {club.points}
-                    </p>
-                    <p className="text-sm text-gray-600">Puntos</p>
                   </div>
                 </div>
 
@@ -532,6 +570,40 @@ export default function Clubs() {
           ))}
         </div>
 
+        {/* Paginación */}
+        {filteredClubs.length > CLUBS_PER_PAGE && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+            <p className="text-sm text-gray-600">
+              Mostrando {from}–{to} de {filteredClubs.length} clubes
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="gap-1"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Anterior
+              </Button>
+              <span className="text-sm text-gray-600 px-2">
+                Página {currentPage} de {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="gap-1"
+              >
+                Siguiente
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
         {filteredClubs.length === 0 && (
           <div className="text-center py-12">
             <MapPin className="w-16 h-16 text-gray-300 mx-auto mb-4" />
@@ -540,30 +612,6 @@ export default function Clubs() {
           </div>
         )}
       </div>
-
-      {/* Información adicional */}
-      <Card className="bg-gradient-to-r from-pink-50 to-blue-50 border-pink-200">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Calendar className="w-5 h-5" style={{ color: 'var(--rotaract-pink)' }} />
-            <span>¿Quieres formar un nuevo club?</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-gray-700 mb-4">
-            Si no hay un club Rotaract en tu área o te interesa formar uno nuevo,
-            contacta con el Distrito correspondiente para obtener información sobre
-            el proceso de creación de nuevos clubes.
-          </p>
-          <Button
-            variant="outline"
-            style={{ borderColor: 'var(--rotaract-pink)', color: 'var(--rotaract-pink)' }}
-            onClick={() => window.open('mailto:info@rotaract.org', '_blank')}
-          >
-            Contactar para Formar Club
-          </Button>
-        </CardContent>
-      </Card>
     </div>
   );
 }

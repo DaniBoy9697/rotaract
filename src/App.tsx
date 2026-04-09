@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Toaster } from 'sonner';
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, Users, Award, Calendar, FileText, Shield, Mail, Home, Trophy } from 'lucide-react';
+import { Menu, X, Users, Award, Calendar, FileText, Home, Trophy } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Separator } from './components/ui/separator';
 
@@ -15,15 +15,13 @@ import Privacy from './components/Privacy';
 import Contact from './components/Contact';
 import Admin from './components/Admin';
 
-const navigationItems = [
-  { id: 'welcome', label: 'Bienvenida', icon: Home },
+const navigationItems: { id: string; label: string; icon: typeof Home; iconOnly?: boolean }[] = [
+  { id: 'welcome', label: 'Bienvenida', icon: Home, iconOnly: true },
   { id: 'clubs', label: 'Directorio de Clubes', icon: Users },
   { id: 'ranking', label: 'Engrane Challenge', icon: Trophy },
   { id: 'awards', label: 'Premios y Galardones', icon: Award },
   { id: 'worldweek', label: 'Semana Mundial Rotaract', icon: Calendar },
   { id: 'posts', label: 'Últimos Posts', icon: FileText },
-  { id: 'privacy', label: 'Aviso de Privacidad', icon: Shield },
-  { id: 'contact', label: 'Contacto', icon: Mail },
 ];
 
 function AppLayout() {
@@ -89,9 +87,10 @@ function AppLayout() {
                       : 'text-gray-700 hover:text-[#E91E63]'
                       }`}
                     style={currentPage === item.id ? { backgroundColor: 'var(--rotaract-pink)' } : {}}
+                    title={item.label}
                   >
                     <Icon className="w-4 h-4" />
-                    <span className="hidden xl:inline">{item.label}</span>
+                    {!item.iconOnly && <span className="hidden xl:inline">{item.label}</span>}
                   </Button>
                 );
               })}
@@ -131,7 +130,7 @@ function AppLayout() {
                     style={currentPage === item.id ? { backgroundColor: 'var(--rotaract-pink)' } : {}}
                   >
                     <Icon className="w-4 h-4 mr-3" />
-                    {item.label}
+                    {item.iconOnly ? <span className="sr-only">{item.label}</span> : item.label}
                   </Button>
                 );
               })}
@@ -189,6 +188,14 @@ function AppLayout() {
                     className="hover:text-white transition-colors"
                   >
                     Premios y Reconocimientos
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={() => setCurrentPage('privacy')}
+                    className="hover:text-white transition-colors"
+                  >
+                    Aviso de Privacidad
                   </button>
                 </li>
                 <li>

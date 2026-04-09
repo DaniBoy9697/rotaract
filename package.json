@@ -2,6 +2,7 @@
   "name": "rotaract",
   "version": "1.0.0",
   "private": true,
+  "proxy": "https://rotaract4185.com",
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",

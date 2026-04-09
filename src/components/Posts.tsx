@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Plus, Calendar, User, Heart, MessageCircle, Share2, Search, Filter, Upload, Eye, ImagePlus, Video } from 'lucide-react';
+import { Plus, Calendar, User, Heart, MessageCircle, Share2, Search, Filter, Upload, Eye } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -13,8 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Alert, AlertDescription } from './ui/alert';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import PostDetail from './PostDetail';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import { CreatePostForm } from './CreatePostForm';
 import { toast } from 'sonner';
 
 // Mock de configuración de WordPress API
@@ -112,14 +111,6 @@ export default function Posts() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Abrir modal "Crear post" si se llegó desde el panel Admin
-  useEffect(() => {
-    if (isLoggedIn && sessionStorage.getItem('openCreatePost')) {
-      sessionStorage.removeItem('openCreatePost');
-      setShowCreatePost(true);
-    }
-  }, [isLoggedIn]);
-
   // Función para cargar posts desde WordPress API
   const loadPostsFromWordPress = async () => {
     setIsLoading(true);
@@ -147,63 +138,6 @@ export default function Posts() {
       setPosts(mockPosts); // fallback a mock si falla
     }
     setIsLoading(false);
-  };
-  // Función para subir medio (imagen/video) a WordPress
-  const uploadMediaToWordPress = async (file: File): Promise<{ url: string; id: number } | null> => {
-    try {
-      const jwtToken = localStorage.getItem('rotaract_jwt');
-      if (!jwtToken) return null;
-      const formData = new FormData();
-      formData.append('file', file);
-      const response = await axios.post(
-        `${WORDPRESS_CONFIG.apiUrl}/media`,
-        formData,
-        {
-          headers: {
-            'Content-Disposition': `attachment; filename="${file.name}"`,
-            'Authorization': `Bearer ${jwtToken}`
-          }
-        }
-      );
-      return { url: response.data.source_url, id: response.data.id };
-    } catch (error) {
-      console.error('Error uploading media to WordPress:', error);
-      return null;
-    }
-  };
-
-  // Función para crear post en WordPress
-  const createPostInWordPress = async (postData: any) => {
-    try {
-      const jwtToken = localStorage.getItem('rotaract_jwt');
-      const wpPostData: Record<string, unknown> = {
-        title: postData.title,
-        content: postData.content,
-        status: 'draft',
-        categories: [getCategoryIdBySlug(postData.category)],
-        meta: {
-          rotaract_club: postData.club,
-          rotaract_author: postData.author
-        }
-      };
-      if (postData.featuredMediaId) {
-        wpPostData.featured_media = postData.featuredMediaId;
-      }
-      const response = await axios.post(
-        `${WORDPRESS_CONFIG.apiUrl}/posts`,
-        wpPostData,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${jwtToken}`
-          }
-        }
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Error creating post in WordPress:', error);
-      throw error;
-    }
   };
 
   // Función para autenticación con WordPress
@@ -235,11 +169,6 @@ export default function Posts() {
     }
   };
 
-  const getCategoryIdBySlug = (categoryName: string) => {
-    const category = categories.find(cat => cat.label === categoryName);
-    return category ? category.id : 1;
-  };
-
   const filteredPosts = posts.filter(post => {
     const matchesSearch = post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          post.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -261,181 +190,10 @@ export default function Posts() {
     setViewMode('list');
   };
 
-  const quillModules = {
-    toolbar: [
-      [{ header: [1, 2, 3, false] }],
-      ['bold', 'italic', 'underline', 'strike'],
-      [{ list: 'ordered' }, { list: 'bullet' }],
-      ['link'],
-      ['clean']
-    ]
-  };
-
-  const CreatePostForm = () => {
-    const [newPost, setNewPost] = useState({
-      title: '',
-      content: '',
-      category: '',
-      image: '',
-      featuredMediaId: 0 as number
-    });
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [uploadingFile, setUploadingFile] = useState(false);
-    const quillRef = useRef<ReactQuill>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = e.target.files;
-      if (!files?.length) return;
-      setUploadingFile(true);
-      const quill = quillRef.current?.getEditor();
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const isVideo = file.type.startsWith('video/');
-        const isImage = file.type.startsWith('image/');
-        if (!isImage && !isVideo) continue;
-        const result = await uploadMediaToWordPress(file);
-        if (result && quill) {
-          const range = quill.getSelection(true);
-          if (isImage) {
-            quill.insertEmbed(range?.index ?? quill.getLength(), 'image', result.url);
-          } else {
-            quill.insertText(range?.index ?? quill.getLength(), `\n[Video: ${result.url}]\n`, 'link', result.url);
-          }
-          if (!newPost.featuredMediaId && isImage) {
-            setNewPost(prev => ({ ...prev, featuredMediaId: result.id, image: result.url }));
-          }
-        }
-      }
-      setUploadingFile(false);
-      e.target.value = '';
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
-      setIsSubmitting(true);
-      try {
-        const postData = {
-          ...newPost,
-          author: currentUser.name,
-          authorAvatar: currentUser.avatar,
-          club: currentUser.club,
-          date: new Date().toISOString().split('T')[0],
-          likes: 0,
-          comments: 0,
-          shares: 0
-        };
-        await createPostInWordPress(postData);
-        setPosts([{ id: Date.now(), ...postData, status: 'pending' }, ...posts]);
-        setNewPost({ title: '', content: '', category: '', image: '', featuredMediaId: 0 });
-        setShowCreatePost(false);
-        toast.success('Post enviado para revisión. Será publicado después de la moderación.');
-      } catch (error) {
-        toast.error('Error al crear el post. Inténtalo de nuevo.');
-      }
-      setIsSubmitting(false);
-    };
-
-    return (
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <Label htmlFor="title">Título del Post</Label>
-          <Input
-            id="title"
-            value={newPost.title}
-            onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
-            placeholder="Escribe un título atractivo"
-            required
-          />
-        </div>
-        <div>
-          <Label htmlFor="category">Categoría</Label>
-          <Select
-            value={newPost.category}
-            onValueChange={(value: string) => setNewPost({ ...newPost, category: value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecciona una categoría" />
-            </SelectTrigger>
-            <SelectContent>
-              {categories.filter(cat => cat.id !== 'all').map(cat => (
-                <SelectItem key={cat.id} value={cat.id}>
-                  {cat.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label>Contenido</Label>
-          <div className="rounded-md border bg-white">
-            <ReactQuill
-              ref={quillRef}
-              theme="snow"
-              value={newPost.content}
-              onChange={(content) => setNewPost({ ...newPost, content })}
-              modules={quillModules}
-              placeholder="Describe tu proyecto, actividad o noticia..."
-              className="min-h-[200px]"
-            />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label>Imágenes y videos</Label>
-          <div className="flex flex-wrap gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*,video/*"
-              multiple
-              className="hidden"
-              onChange={handleFileSelect}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingFile}
-            >
-              <ImagePlus className="w-4 h-4 mr-2" />
-              {uploadingFile ? 'Subiendo...' : 'Subir imagen'}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingFile}
-            >
-              <Video className="w-4 h-4 mr-2" />
-              Subir video
-            </Button>
-          </div>
-          <p className="text-xs text-gray-500">
-            Las imágenes se insertan en el texto; la primera será la portada del post.
-          </p>
-        </div>
-        <div>
-          <Label htmlFor="image">URL de imagen de portada (opcional)</Label>
-          <Input
-            id="image"
-            type="url"
-            value={newPost.image}
-            onChange={(e) => setNewPost({ ...newPost, image: e.target.value })}
-            placeholder="https://ejemplo.com/imagen.jpg"
-          />
-        </div>
-        <Button
-          type="submit"
-          className="w-full"
-          disabled={isSubmitting || !newPost.content.trim()}
-          style={{ backgroundColor: 'var(--rotaract-pink)' }}
-        >
-          {isSubmitting ? 'Enviando...' : 'Enviar Post para Revisión'}
-        </Button>
-      </form>
-    );
+  const handleCreatePostSuccess = () => {
+    setShowCreatePost(false);
+    toast.success('Post enviado para revisión. Será publicado después de la moderación.');
+    loadPostsFromWordPress();
   };
 
   // Renderizar vista detallada si está seleccionada
@@ -539,14 +297,19 @@ export default function Posts() {
                       Crear Post
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
+                  <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-6xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>Crear Nuevo Post</DialogTitle>
                       <DialogDescription>
                         Comparte las actividades y logros de tu club con la comunidad Rotaract
                       </DialogDescription>
                     </DialogHeader>
-                    <CreatePostForm />
+                    {currentUser && (
+                      <CreatePostForm
+                        user={{ name: currentUser.name, avatar: currentUser.avatar, club: currentUser.club }}
+                        onSuccess={handleCreatePostSuccess}
+                      />
+                    )}
                   </DialogContent>
                 </Dialog>
               )}

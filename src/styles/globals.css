@@ -197,3 +197,23 @@
 html {
   font-size: var(--font-size);
 }
+
+/* Quill editor: un solo borde, área de edición a ancho/alto completo del componente */
+.create-post-quill-wrapper .ql-toolbar.ql-snow {
+  border: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 0.5rem 0.5rem 0 0;
+  background: #fafafa;
+}
+.create-post-quill-wrapper .ql-container.ql-snow {
+  border: none;
+  border-radius: 0 0 0.5rem 0.5rem;
+}
+.create-post-quill-wrapper .ql-editor {
+  min-height: 260px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.create-post-quill-wrapper .ql-editor.ql-blank::before {
+  color: #9ca3af;
+}

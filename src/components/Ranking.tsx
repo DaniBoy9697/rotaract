@@ -3,23 +3,17 @@ import axios from 'axios';
 import {
   Trophy,
   MapPin,
-  User,
   Star,
   Medal,
   Crown,
-  Filter,
-  LogIn,
-  Save,
   Table2,
   ChevronDown,
   ChevronUp,
-  Lock,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
 import { Label } from './ui/label';
 import {
   ENGrane_MONTHS,
@@ -71,15 +65,8 @@ export default function Ranking() {
   const [clubs, setClubs] = useState<ClubEngrane[]>(MOCK_CLUBS);
   const [scores, setScores] = useState<Record<string, ScoreMatrix>>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showTable, setShowTable] = useState(false);
-  const [showAdmin, setShowAdmin] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [showLogin, setShowLogin] = useState(false);
-  const [loginUsername, setLoginUsername] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [loginError, setLoginError] = useState<string | null>(null);
 
   const flattenedCols = useMemo(() => getFlattenedColumns(), []);
 
@@ -112,85 +99,7 @@ export default function Ranking() {
 
   useEffect(() => {
     loadFromWordPress();
-    const jwt = localStorage.getItem('rotaract_jwt');
-    setIsAdmin(!!jwt);
   }, []);
-
-  const saveToWordPress = async () => {
-    if (!WORDPRESS_CONFIG.apiUrl) {
-      setError('Configura REACT_APP_WORDPRESS_API para guardar.');
-      return;
-    }
-    const token = localStorage.getItem('rotaract_jwt');
-    if (!token) {
-      setError('Debes iniciar sesión para guardar.');
-      return;
-    }
-    setIsSaving(true);
-    setError(null);
-    try {
-      await axios.post(
-        ENGrane_API,
-        { clubs, scores },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-      setError(null);
-    } catch (err) {
-      console.error('Error saving Engrane Challenge:', err);
-      setError('No se pudo guardar. Revisa que el endpoint en WordPress exista y acepte POST con JWT.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const authenticate = async () => {
-    if (!loginUsername.trim() || !loginPassword) {
-      setLoginError('Usuario y contraseña requeridos.');
-      return;
-    }
-    setLoginError(null);
-    try {
-      const res = await axios.post(
-        WORDPRESS_CONFIG.jwtEndpoint,
-        { username: loginUsername, password: loginPassword },
-        { headers: { 'Content-Type': 'application/json' } }
-      );
-      const auth = res.data;
-      localStorage.setItem('rotaract_jwt', auth.token);
-      localStorage.setItem(
-        'rotaract_user',
-        JSON.stringify({
-          id: auth.user_id,
-          username: auth.user_nicename,
-          name: auth.user_display_name,
-        })
-      );
-      setIsAdmin(true);
-      setShowLogin(false);
-      setLoginUsername('');
-      setLoginPassword('');
-    } catch (err) {
-      console.error('Error logging in:', err);
-      setLoginError('Usuario o contraseña incorrectos.');
-    }
-  };
-
-  const updateScore = (clubId: string | number, monthKey: string, subKey: string, value: number) => {
-    const id = String(clubId);
-    setScores((prev) => {
-      const next = { ...prev };
-      if (!next[id]) next[id] = {};
-      if (!next[id][monthKey]) next[id][monthKey] = {};
-      next[id] = { ...next[id] };
-      next[id][monthKey] = { ...next[id][monthKey], [subKey]: value };
-      return next;
-    });
-  };
 
   const getScore = (clubId: string | number, monthKey: string, subKey: string): number => {
     const byMonth = scores[String(clubId)];
@@ -280,156 +189,9 @@ export default function Ranking() {
                 {showTable ? <ChevronUp className="w-4 h-4 ml-2" /> : <ChevronDown className="w-4 h-4 ml-2" />}
               </Button>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setShowAdmin(!showAdmin);
-                  if (!showAdmin && !localStorage.getItem('rotaract_jwt')) setShowLogin(true);
-                }}
-                style={{ borderColor: 'var(--rotaract-pink)', color: 'var(--rotaract-pink)' }}
-              >
-                <Lock className="w-4 h-4 mr-2" />
-                {isAdmin ? (showAdmin ? 'Ocultar panel admin' : 'Administrar puntajes') : 'Acceso admin'}
-              </Button>
-            </div>
           </div>
         </CardContent>
       </Card>
-
-      {/* Login admin */}
-      {showAdmin && !isAdmin && (
-        <Card className="border-2" style={{ borderColor: 'var(--rotaract-pink)' }}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <LogIn className="w-5 h-5" />
-              Iniciar sesión (WordPress)
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {showLogin ? (
-              <>
-                <div>
-                  <Label>Usuario</Label>
-                  <Input
-                    value={loginUsername}
-                    onChange={(e) => setLoginUsername(e.target.value)}
-                    placeholder="Usuario WordPress"
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label>Contraseña</Label>
-                  <Input
-                    type="password"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="Contraseña"
-                    className="mt-1"
-                  />
-                </div>
-                {loginError && <p className="text-sm text-red-600">{loginError}</p>}
-                <Button onClick={authenticate} style={{ backgroundColor: 'var(--rotaract-pink)' }}>
-                  Entrar
-                </Button>
-              </>
-            ) : (
-              <Button onClick={() => setShowLogin(true)} variant="outline">
-                Mostrar formulario de login
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Panel admin: tabla tipo Excel para subir puntajes */}
-      {showAdmin && isAdmin && (
-        <Card className="border-2 overflow-hidden" style={{ borderColor: 'var(--rotaract-pink)' }}>
-          <CardHeader className="bg-pink-50">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <CardTitle className="flex items-center gap-2">
-                <Table2 className="w-5 h-5" />
-                Cargar / editar puntajes por club
-              </CardTitle>
-              <Button
-                onClick={saveToWordPress}
-                disabled={isSaving}
-                style={{ backgroundColor: 'var(--rotaract-pink)' }}
-              >
-                <Save className="w-4 h-4 mr-2" />
-                {isSaving ? 'Guardando…' : 'Guardar en WordPress'}
-              </Button>
-            </div>
-            <p className="text-sm text-gray-600">
-              Edita los puntos en cada celda y guarda. Los datos se envían al endpoint de WordPress.
-            </p>
-          </CardHeader>
-          <CardContent className="p-0 overflow-x-auto">
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="border border-gray-300 p-2 text-left font-semibold sticky left-0 bg-gray-100 z-10 min-w-[200px]">
-                    Club Rotaract
-                  </th>
-                  {ENGrane_MONTHS.map((month) => (
-                    <th
-                      key={month.key}
-                      colSpan={
-                        month.categories.reduce((n, c) => n + c.subcategories.length, 0)
-                      }
-                      className="border border-gray-300 p-2 text-center font-semibold text-white"
-                      style={{ backgroundColor: month.headerColor }}
-                    >
-                      {month.label}
-                    </th>
-                  ))}
-                </tr>
-                <tr className="bg-gray-50">
-                  <th className="border border-gray-300 p-1 sticky left-0 bg-gray-50 z-10" />
-                  {ENGrane_MONTHS.map((month) =>
-                    month.categories.map((cat) =>
-                      cat.subcategories.map((sub) => (
-                        <th
-                          key={`${month.key}-${sub.key}`}
-                          className="border border-gray-300 p-1 font-normal text-gray-700 max-w-[100px]"
-                          title={`Máx. ${sub.maxPoints} pts`}
-                        >
-                          {sub.label} (máx. {sub.maxPoints})
-                        </th>
-                      ))
-                    )
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {clubs.map((club) => (
-                  <tr key={club.id} className="hover:bg-pink-50/50">
-                    <td className="border border-gray-300 p-2 sticky left-0 bg-white font-medium">
-                      {club.name}
-                    </td>
-                    {flattenedCols.map(({ monthKey, sub }) => (
-                      <td key={`${club.id}-${monthKey}-${sub.key}`} className="border border-gray-300 p-0">
-                        <Input
-                          type="number"
-                          min={0}
-                          max={sub.maxPoints}
-                          value={getScore(club.id, monthKey, sub.key) || ''}
-                          onChange={(e) => {
-                            const v = e.target.value === '' ? 0 : Math.min(sub.maxPoints, Math.max(0, Number(e.target.value)));
-                            updateScore(club.id, monthKey, sub.key, v);
-                          }}
-                          className="h-9 rounded-none border-0 text-center w-14 max-w-[100px]"
-                        />
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Podio Top 3 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

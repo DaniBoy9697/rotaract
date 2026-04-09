@@ -1,13 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { LogIn, FileText, User, LogOut } from 'lucide-react';
+import { LogIn, FileText, User, LogOut, Trophy, Upload, Check, AlertCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
+import { parseEngraneCsv, getEngraneCsvHeaders } from '../utils/engraneCsvParser';
+import type { EngraneChallengeData } from '../config/engraneChallenge';
+import { CreatePostForm } from './CreatePostForm';
+import { toast } from 'sonner';
 
 const JWT_ENDPOINT = process.env.REACT_APP_JWT_ENDPOINT || '';
+const WP_API = process.env.REACT_APP_WORDPRESS_API || '';
+const ENGrane_API = `${WP_API}/wp-json/rotaract/v1/engrane-challenge`;
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -65,79 +72,313 @@ export default function Admin() {
     setUser(null);
   };
 
-  const goToCreatePost = () => {
-    sessionStorage.setItem('openCreatePost', '1');
-    navigate('/posts');
+  const [showCreatePostModal, setShowCreatePostModal] = useState(false);
+  type AdminSection = 'posts' | 'engrane';
+  const [adminSection, setAdminSection] = useState<AdminSection>('posts');
+
+  const openCreatePostModal = () => setShowCreatePostModal(true);
+
+  const handleCreatePostSuccess = () => {
+    setShowCreatePostModal(false);
+    toast.success('Post enviado para revisión. Será publicado después de la moderación.');
+  };
+
+  // Engrane Challenge: carga CSV
+  const [csvInput, setCsvInput] = useState('');
+  const [engranePreview, setEngranePreview] = useState<EngraneChallengeData | null>(null);
+  const [engraneError, setEngraneError] = useState<string | null>(null);
+  const [isSavingEngrane, setIsSavingEngrane] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleEngraneFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCsvInput(String(reader.result ?? ''));
+      setEngranePreview(null);
+      setEngraneError(null);
+    };
+    reader.readAsText(file, 'UTF-8');
+    e.target.value = '';
+  };
+
+  const handleValidarEngrane = () => {
+    setEngraneError(null);
+    setEngranePreview(null);
+    const result = parseEngraneCsv(csvInput);
+    if ('error' in result) {
+      setEngraneError(result.error);
+      return;
+    }
+    setEngranePreview(result.data);
+  };
+
+  const handleGuardarEngrane = async () => {
+    if (!engranePreview) return;
+    const token = localStorage.getItem('rotaract_jwt');
+    if (!token) {
+      const { toast } = await import('sonner');
+      toast.error('Inicia sesión para guardar.');
+      return;
+    }
+    if (!WP_API) {
+      const { toast } = await import('sonner');
+      toast.error('Configura REACT_APP_WORDPRESS_API.');
+      return;
+    }
+    setIsSavingEngrane(true);
+    try {
+      await axios.post(ENGrane_API, engranePreview, {
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      });
+      const { toast } = await import('sonner');
+      toast.success('Datos del Engrane Challenge guardados correctamente.');
+    } catch (err) {
+      const { toast } = await import('sonner');
+      toast.error('No se pudo guardar. Revisa el endpoint y tu sesión.');
+    } finally {
+      setIsSavingEngrane(false);
+    }
+  };
+
+  const downloadPlantilla = () => {
+    const headers = getEngraneCsvHeaders();
+    const blob = new Blob([headers + '\n'], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'engrane-challenge-plantilla.csv';
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   if (user) {
     return (
-      <div className="max-w-2xl mx-auto space-y-8">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900">Panel de administración</h1>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-600 flex items-center gap-2">
-              <User className="w-4 h-4" />
-              {user.name}
-            </span>
-            <Button variant="outline" size="sm" onClick={handleLogout}>
-              <LogOut className="w-4 h-4 mr-2" />
-              Cerrar sesión
-            </Button>
-          </div>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Card
-            className="cursor-pointer transition-shadow hover:shadow-md border-2 border-transparent hover:border-pink-200"
-            onClick={goToCreatePost}
-          >
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-12 h-12 rounded-xl flex items-center justify-center"
-                  style={{ backgroundColor: 'var(--rotaract-pink)', color: 'white' }}
-                >
-                  <FileText className="w-6 h-6" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg">Crear post</CardTitle>
-                  <CardDescription>Publicar una nueva entrada o noticia</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
-
-          <Card className="opacity-75 border-dashed">
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center text-gray-400">
-                  <FileText className="w-6 h-6" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg text-gray-500">Editar posts</CardTitle>
-                  <CardDescription>Próximamente</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
-        </div>
-
-        <Card className="bg-gray-50 border-gray-200">
-          <CardContent className="pt-6">
-            <p className="text-sm text-gray-600">
-              Desde aquí puedes ir a la sección de posts para crear contenido. Más opciones de administración estarán disponibles próximamente.
-            </p>
-            <Button
-              variant="outline"
-              className="mt-4"
-              style={{ borderColor: 'var(--rotaract-pink)', color: 'var(--rotaract-pink)' }}
-              onClick={() => navigate('/posts')}
+      <div className="flex min-h-screen bg-gray-50">
+        {/* Menú lateral */}
+        <aside className="w-56 shrink-0 border-r border-gray-200 bg-white py-6 px-4">
+          <nav className="space-y-1">
+            <button
+              type="button"
+              onClick={() => setAdminSection('posts')}
+              className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                adminSection === 'posts'
+                  ? 'text-white'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+              style={adminSection === 'posts' ? { backgroundColor: 'var(--rotaract-pink)' } : {}}
             >
-              Ver todos los posts
-            </Button>
+              <FileText className="w-5 h-5 shrink-0" />
+              Posts
+            </button>
+            <button
+              type="button"
+              onClick={() => setAdminSection('engrane')}
+              className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                adminSection === 'engrane'
+                  ? 'text-white'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+              style={adminSection === 'engrane' ? { backgroundColor: 'var(--rotaract-pink)' } : {}}
+            >
+              <Trophy className="w-5 h-5 shrink-0" />
+              Engrane Challenge
+            </button>
+          </nav>
+        </aside>
+
+        {/* Contenido principal */}
+        <main className="flex-1 min-w-0">
+          <div className="max-w-4xl mx-auto px-6 sm:px-8 lg:px-10 py-8 space-y-8">
+            {/* Header con más espacio */}
+            <header className="flex items-center justify-between px-1">
+              <h1 className="text-2xl font-bold text-gray-900">Panel de administración</h1>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-600 flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  {user.name}
+                </span>
+                <Button variant="outline" size="sm" onClick={handleLogout}>
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Cerrar sesión
+                </Button>
+              </div>
+            </header>
+
+            {adminSection === 'posts' && (
+              <>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Card
+                    className="cursor-pointer transition-shadow hover:shadow-md border-2 border-transparent hover:border-pink-200"
+                    onClick={openCreatePostModal}
+                  >
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-12 h-12 rounded-xl flex items-center justify-center"
+                          style={{ backgroundColor: 'var(--rotaract-pink)', color: 'white' }}
+                        >
+                          <FileText className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg">Crear post</CardTitle>
+                          <CardDescription>Publicar una nueva entrada o noticia</CardDescription>
+                        </div>
+                      </div>
+                    </CardHeader>
+                  </Card>
+
+                  <Card
+                    className="cursor-pointer opacity-90 hover:opacity-100 transition-shadow hover:shadow-md border-2 border-transparent hover:border-pink-200"
+                    onClick={() => navigate('/posts')}
+                  >
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center text-gray-500">
+                          <FileText className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg">Editar posts</CardTitle>
+                          <CardDescription>Ver y gestionar publicaciones</CardDescription>
+                        </div>
+                      </div>
+                    </CardHeader>
+                  </Card>
+                </div>
+
+                <Card className="bg-gray-50 border-gray-200">
+                  <CardContent className="pt-6">
+                    <p className="text-sm text-gray-600">
+                      Desde aquí puedes crear contenido o ir a la sección de posts para ver y editar todas las publicaciones.
+                    </p>
+                    <Button
+                      variant="outline"
+                      className="mt-4"
+                      style={{ borderColor: 'var(--rotaract-pink)', color: 'var(--rotaract-pink)' }}
+                      onClick={() => navigate('/posts')}
+                    >
+                      Ver todos los posts
+                    </Button>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+
+            {adminSection === 'engrane' && (
+              <Card className="border-2 border-transparent hover:border-pink-200 transition-colors">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-3">
+              <div
+                className="w-12 h-12 rounded-xl flex items-center justify-center text-white"
+                style={{ backgroundColor: 'var(--rotaract-pink)' }}
+              >
+                <Trophy className="w-6 h-6" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">Engrane Challenge</CardTitle>
+                <CardDescription>Sube o pega datos desde Excel/CSV para actualizar el ranking</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.txt"
+                className="hidden"
+                onChange={handleEngraneFile}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                style={{ borderColor: 'var(--rotaract-pink)' }}
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Seleccionar archivo CSV
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={downloadPlantilla}>
+                Descargar plantilla CSV
+              </Button>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="engrane-csv">O pega aquí el contenido CSV (cabeceras: id, name, city, state y columnas de puntuación)</Label>
+              <textarea
+                id="engrane-csv"
+                value={csvInput}
+                onChange={(e) => {
+                  setCsvInput(e.target.value);
+                  setEngraneError(null);
+                  setEngranePreview(null);
+                }}
+                placeholder="id,name,city,state,tesoreria_julio,dei_julio,..."
+                rows={6}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-pink-300"
+              />
+            </div>
+            {engraneError && (
+              <div className="flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-800">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>{engraneError}</span>
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleValidarEngrane}
+                disabled={!csvInput.trim()}
+              >
+                <Check className="w-4 h-4 mr-2" />
+                Validar
+              </Button>
+              <Button
+                type="button"
+                onClick={handleGuardarEngrane}
+                disabled={!engranePreview}
+                style={{ backgroundColor: 'var(--rotaract-pink)', color: 'white' }}
+              >
+                {isSavingEngrane ? 'Guardando...' : 'Guardar en WordPress'}
+              </Button>
+            </div>
+            {engranePreview && (
+              <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+                <p className="font-medium">Vista previa: {engranePreview.clubs.length} club(es) listos para guardar.</p>
+                <ul className="mt-1 list-disc list-inside text-green-700">
+                  {engranePreview.clubs.slice(0, 8).map((c) => (
+                    <li key={String(c.id)}>{c.name}</li>
+                  ))}
+                  {engranePreview.clubs.length > 8 && (
+                    <li>… y {engranePreview.clubs.length - 8} más</li>
+                  )}
+                </ul>
+              </div>
+            )}
           </CardContent>
         </Card>
+            )}
+          </div>
+        </main>
+
+        {/* Modal Crear Post - más grande */}
+        <Dialog open={showCreatePostModal} onOpenChange={setShowCreatePostModal}>
+          <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-6xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Crear Nuevo Post</DialogTitle>
+              <DialogDescription>
+                Comparte las actividades y logros de tu club con la comunidad Rotaract
+              </DialogDescription>
+            </DialogHeader>
+            {user && (() => {
+              const saved = localStorage.getItem('rotaract_user');
+              const fullUser = saved ? (() => { try { const u = JSON.parse(saved); return { name: u.name || u.username || user.name, avatar: u.avatar || user.avatar, club: u.club || '' }; } catch { return { name: user.name, avatar: user.avatar, club: '' }; } })() : { name: user.name, avatar: user.avatar, club: '' };
+              return <CreatePostForm user={fullUser} onSuccess={handleCreatePostSuccess} />;
+            })()}
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
